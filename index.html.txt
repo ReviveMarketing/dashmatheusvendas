@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Vendas Revive - Matheus</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #020617;
+  color: white;
+}
+
+header {
+  padding: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  background: linear-gradient(90deg,#4f46e5,#7c3aed);
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  padding: 20px;
+}
+
+.card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 16px;
+}
+
+input, select {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(90deg,#4f46e5,#7c3aed);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.kpi {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.kpi div {
+  background: rgba(255,255,255,0.05);
+  padding: 15px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.ranking div {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.insight {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>Vendas Revive - Matheus</header>
+
+<div class="container">
+
+<!-- INPUT -->
+<div class="card">
+
+<h3>Inserir Dados</h3>
+
+<select id="consultor">
+<option>Matheus</option>
+<option>Consultor A</option>
+<option>Consultor B</option>
+</select>
+
+<input type="number" id="aguardando" placeholder="Aguardando">
+<input type="number" id="fechado" placeholder="Fechado">
+<input type="number" id="negociacao" placeholder="Negociação">
+<input type="number" id="semDados" placeholder="Sem Dados">
+<input type="number" id="semPossibilidade" placeholder="Sem Possibilidade">
+<input type="number" id="visita" placeholder="Visita">
+
+<button onclick="salvar()">Salvar</button>
+
+</div>
+
+<!-- DASHBOARD -->
+<div>
+
+<div class="kpi">
+<div>
+<h4>Fechados</h4>
+<p id="kpiFechado">0</p>
+</div>
+
+<div>
+<h4>Conversão</h4>
+<p id="kpiConversao">0%</p>
+</div>
+
+<div>
+<h4>Total</h4>
+<p id="kpiTotal">0</p>
+</div>
+</div>
+
+<div class="card">
+<canvas id="graficoBar"></canvas>
+</div>
+
+<div class="card">
+<canvas id="graficoLinha"></canvas>
+</div>
+
+<div class="card ranking">
+<h3>Ranking</h3>
+<div id="ranking"></div>
+</div>
+
+<div class="card">
+<h3>Insight</h3>
+<div class="insight" id="insight"></div>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+let dados = JSON.parse(localStorage.getItem("dados")) || [];
+
+function salvar() {
+
+const entry = {
+consultor: document.getElementById("consultor").value,
+data: new Date().toISOString(),
+stats: {
+aguardando: +document.getElementById("aguardando").value || 0,
+fechado: +document.getElementById("fechado").value || 0,
+negociacao: +document.getElementById("negociacao").value || 0,
+semDados: +document.getElementById("semDados").value || 0,
+semPossibilidade: +document.getElementById("semPossibilidade").value || 0,
+visita: +document.getElementById("visita").value || 0
+}
+};
+
+dados.push(entry);
+localStorage.setItem("dados", JSON.stringify(dados));
+
+atualizar();
+}
+
+function calcularTotais() {
+
+let total = 0;
+let fechado = 0;
+let negociacao = 0;
+
+dados.forEach(d => {
+Object.values(d.stats).forEach(v => total += v);
+fechado += d.stats.fechado;
+negociacao += d.stats.negociacao;
+});
+
+return {total, fechado, negociacao};
+}
+
+function ranking() {
+
+let mapa = {};
+
+dados.forEach(d => {
+if(!mapa[d.consultor]) mapa[d.consultor] = 0;
+mapa[d.consultor] += d.stats.fechado;
+});
+
+return Object.entries(mapa).sort((a,b)=>b[1]-a[1]);
+}
+
+function gerarInsight(totais) {
+if(totais.fechado > totais.negociacao) {
+return "Alta eficiência de fechamento.";
+} else {
+return "Pipeline maior que conversão — oportunidade de melhoria.";
+}
+}
+
+let bar, linha;
+
+function atualizar() {
+
+const totais = calcularTotais();
+
+document.getElementById("kpiFechado").innerText = totais.fechado;
+document.getElementById("kpiTotal").innerText = totais.total;
+document.getElementById("kpiConversao").innerText =
+((totais.fechado/(totais.total||1))*100).toFixed(1) + "%";
+
+document.getElementById("insight").innerText = gerarInsight(totais);
+
+// ranking
+const rank = ranking();
+const div = document.getElementById("ranking");
+div.innerHTML = "";
+
+rank.forEach((r,i)=>{
+div.innerHTML += `<div>#${i+1} ${r[0]} <b>${r[1]}</b></div>`;
+});
+
+// gráfico barras
+const labels = ["Aguardando","Fechado","Negociação","Sem Dados","Sem Possibilidade","Visita"];
+let valores = [0,0,0,0,0,0];
+
+dados.forEach(d=>{
+valores[0]+=d.stats.aguardando;
+valores[1]+=d.stats.fechado;
+valores[2]+=d.stats.negociacao;
+valores[3]+=d.stats.semDados;
+valores[4]+=d.stats.semPossibilidade;
+valores[5]+=d.stats.visita;
+});
+
+if(bar) bar.destroy();
+bar = new Chart(document.getElementById("graficoBar"), {
+type: "bar",
+data: { labels, datasets: [{ data: valores }] }
+});
+
+// linha
+const timeline = dados.map(d=>({
+data: new Date(d.data).toLocaleDateString(),
+fechado: d.stats.fechado
+}));
+
+if(linha) linha.destroy();
+linha = new Chart(document.getElementById("graficoLinha"), {
+type: "line",
+data: {
+labels: timeline.map(t=>t.data),
+datasets: [{ data: timeline.map(t=>t.fechado) }]
+}
+});
+
+}
+
+atualizar();
+
+</script>
+
+</body>
+</html>
