@@ -1,0 +1,408 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+  PieChart, Pie, Cell, AreaChart, Area 
+} from 'recharts';
+import { 
+  Users, TrendingUp, Target, Award, Download, Save, Filter, 
+  PlusCircle, Trash2, ChevronRight, BarChart3, PieChart as PieIcon, LayoutDashboard,
+  Clock, CheckCircle2, MessageSquare, AlertCircle, XCircle, Footprints,
+  Sun, Moon, Calendar, ArrowUpRight, ArrowDownRight, Scale
+} from 'lucide-react';
+
+/**
+ * CONFIGURAÇÕES E CONSTANTES
+ */
+const STATUS_CONFIG = {
+  aguardando: { label: 'Aguardando Resposta', color: '#6366f1', icon: Clock },
+  fechado: { label: 'Fechado', color: '#10b981', icon: CheckCircle2 },
+  negociacao: { label: 'Negociação', color: '#f59e0b', icon: MessageSquare },
+  semDados: { label: 'Sem Dados', color: '#94a3b8', icon: AlertCircle },
+  semPossibilidade: { label: 'Sem Possibilidade', color: '#ef4444', icon: XCircle },
+  visita: { label: 'Visita Corriqueira', color: '#8b5cf6', icon: Footprints },
+};
+
+const CONSULTANTS_INITIAL = ['Matheus', 'Consultor A', 'Consultor B'];
+
+const App = () => {
+  // --- ESTADO ---
+  const [data, setData] = useState([]);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [activeConsultant, setActiveConsultant] = useState(CONSULTANTS_INITIAL[0]);
+  const [formData, setFormData] = useState({
+    aguardando: 0, fechado: 0, negociacao: 0, semDados: 0, semPossibilidade: 0, visita: 0
+  });
+  
+  // Filtros
+  const [filterConsultant, setFilterConsultant] = useState('Todos');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  
+  // Comparação
+  const [isComparing, setIsComparing] = useState(false);
+  const [compDateFilter, setCompDateFilter] = useState({ start: '', end: '' });
+
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // --- PERSISTÊNCIA ---
+  useEffect(() => {
+    const savedData = localStorage.getItem('vendas_revive_data');
+    const savedTheme = localStorage.getItem('vendas_revive_theme');
+    if (savedData) setData(JSON.parse(savedData));
+    if (savedTheme) setIsDarkMode(JSON.parse(savedTheme));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('vendas_revive_data', JSON.stringify(data));
+    localStorage.setItem('vendas_revive_theme', JSON.stringify(isDarkMode));
+  }, [data, isDarkMode]);
+
+  // --- LÓGICA DE FILTRAGEM ---
+  const getFilteredTotals = (targetData, consultant, range) => {
+    let filtered = targetData;
+    
+    if (consultant !== 'Todos') {
+      filtered = filtered.filter(d => d.consultant === consultant);
+    }
+    
+    if (range.start) {
+      filtered = filtered.filter(d => d.date.split('T')[0] >= range.start);
+    }
+    
+    if (range.end) {
+      filtered = filtered.filter(d => d.date.split('T')[0] <= range.end);
+    }
+
+    const res = { aguardando: 0, fechado: 0, negociacao: 0, semDados: 0, semPossibilidade: 0, visita: 0, total: 0 };
+    filtered.forEach(entry => {
+      Object.keys(STATUS_CONFIG).forEach(key => {
+        res[key] += Number(entry.stats[key] || 0);
+        res.total += Number(entry.stats[key] || 0);
+      });
+    });
+    return res;
+  };
+
+  const mainTotals = useMemo(() => getFilteredTotals(data, filterConsultant, dateFilter), [data, filterConsultant, dateFilter]);
+  const compTotals = useMemo(() => isComparing ? getFilteredTotals(data, filterConsultant, compDateFilter) : null, [data, filterConsultant, compDateFilter, isComparing]);
+
+  const calculateTrend = (current, previous) => {
+    if (!previous || previous === 0) return null;
+    return (((current - previous) / previous) * 100).toFixed(1);
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    const entry = {
+      id: Date.now(),
+      date: new Date().toISOString(),
+      consultant: activeConsultant,
+      stats: { ...formData }
+    };
+    setData([entry, ...data]);
+    setFormData({ aguardando: 0, fechado: 0, negociacao: 0, semDados: 0, semPossibilidade: 0, visita: 0 });
+    setActiveTab('dashboard');
+  };
+
+  const exportToCSV = () => {
+    const headers = ['Data', 'Consultor', ...Object.values(STATUS_CONFIG).map(s => s.label)];
+    const rows = data.map(item => [
+      new Date(item.date).toLocaleDateString(),
+      item.consultant,
+      ...Object.keys(STATUS_CONFIG).map(k => item.stats[k])
+    ]);
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.setAttribute("href", URL.createObjectURL(blob));
+    link.setAttribute("download", `vendas_revive_${new Date().toISOString().split('T')[0]}.csv`);
+    link.click();
+  };
+
+  // --- TEMAS (CLASSES DINÂMICAS) ---
+  const theme = {
+    bg: isDarkMode ? 'bg-black text-slate-200' : 'bg-slate-50 text-slate-800',
+    sidebar: isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200',
+    card: isDarkMode ? 'bg-slate-900 border-slate-800 shadow-black/40' : 'bg-white border-slate-200 shadow-slate-200/50',
+    input: isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900',
+    textMuted: isDarkMode ? 'text-slate-500' : 'text-slate-400',
+    textMain: isDarkMode ? 'text-white' : 'text-slate-900',
+    hover: isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100',
+    border: isDarkMode ? 'border-slate-800' : 'border-slate-200',
+  };
+
+  // --- COMPONENTES DE UI ---
+  const ComparisonBadge = ({ current, previous }) => {
+    const trend = calculateTrend(current, previous);
+    if (trend === null) return null;
+    const isPositive = trend >= 0;
+    return (
+      <div className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full mt-2 ${isPositive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+        {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+        {Math.abs(trend)}%
+      </div>
+    );
+  };
+
+  const Card = ({ title, value, icon: Icon, color, subValue, compareValue }) => (
+    <div className={`${theme.card} border rounded-2xl p-6 shadow-xl transition-all`}>
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <p className={`${theme.textMuted} text-xs font-bold uppercase tracking-wider`}>{title}</p>
+          <div className="flex items-baseline gap-3">
+            <h3 className={`text-3xl font-black ${theme.textMain} mt-1`}>{value}</h3>
+            {isComparing && <ComparisonBadge current={value} previous={compareValue} />}
+          </div>
+          {subValue && <p className={`${theme.textMuted} text-[10px] mt-2 font-mono uppercase tracking-widest`}>{subValue}</p>}
+        </div>
+        <div className={`p-3 rounded-xl bg-opacity-10 ${color}`}>
+          <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`min-h-screen ${theme.bg} font-sans transition-colors duration-300`}>
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 h-full w-64 ${theme.sidebar} border-r hidden lg:flex flex-col z-50`}>
+        <div className="p-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
+              <TrendingUp className="text-white w-6 h-6" />
+            </div>
+            <div>
+              <h1 className={`font-bold ${theme.textMain} tracking-tight`}>Vendas Revive</h1>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Matheus</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-1">
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : `text-slate-400 ${theme.hover}`}`}>
+            <LayoutDashboard className="w-5 h-5" /> <span className="font-medium text-sm">Dashboard</span>
+          </button>
+          <button onClick={() => setActiveTab('entry')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'entry' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : `text-slate-400 ${theme.hover}`}`}>
+            <PlusCircle className="w-5 h-5" /> <span className="font-medium text-sm">Inserir Dados</span>
+          </button>
+          <button onClick={() => setActiveTab('data')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'data' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : `text-slate-400 ${theme.hover}`}`}>
+            <BarChart3 className="w-5 h-5" /> <span className="font-medium text-sm">Histórico</span>
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-slate-800/50 mt-auto">
+          <button 
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${theme.hover} text-slate-400`}
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            <span className="font-medium text-sm">{isDarkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="lg:ml-64 p-4 lg:p-8 pb-24 lg:pb-10">
+        
+        {/* Header c/ Filtros Avançados */}
+        <header className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h2 className={`text-2xl font-black ${theme.textMain} tracking-tight`}>
+                {activeTab === 'dashboard' ? 'Business Intelligence' : activeTab === 'entry' ? 'Entrada de Dados' : 'Relatório Analítico'}
+              </h2>
+              <p className={`${theme.textMuted} text-sm`}>Sistemas Revive — Performance em tempo real</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3">
+               <button 
+                onClick={() => setIsComparing(!isComparing)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isComparing ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : `${theme.card} ${theme.textMuted}`}`}
+              >
+                <Scale className="w-4 h-4" />
+                {isComparing ? 'Modo Comparativo ON' : 'Comparar Períodos'}
+              </button>
+              <button onClick={exportToCSV} className="flex items-center gap-2 bg-indigo-600 text-white font-bold text-xs px-4 py-2 rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20">
+                <Download className="w-4 h-4" /> Exportar
+              </button>
+            </div>
+          </div>
+
+          {/* Barra de Filtros */}
+          {activeTab === 'dashboard' && (
+            <div className={`mt-6 p-4 ${theme.card} border rounded-2xl flex flex-wrap items-center gap-6 shadow-sm`}>
+               <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-indigo-500 uppercase flex items-center gap-1">
+                    <Users className="w-3 h-3" /> Consultor
+                  </label>
+                  <select 
+                    className={`bg-transparent text-sm font-bold focus:outline-none ${theme.textMain} cursor-pointer`}
+                    value={filterConsultant}
+                    onChange={(e) => setFilterConsultant(e.target.value)}
+                  >
+                    <option value="Todos">Todos os Membros</option>
+                    {CONSULTANTS_INITIAL.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+               </div>
+
+               <div className="h-8 w-px bg-slate-800/50 hidden md:block" />
+
+               <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                  <label className="text-[10px] font-bold text-indigo-500 uppercase flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> {isComparing ? 'Período Principal' : 'Filtrar por Data (Dia/Mês)'}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input type="date" className={`bg-transparent text-xs ${theme.textMain} focus:outline-none`} value={dateFilter.start} onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})} />
+                    <span className="text-slate-600">→</span>
+                    <input type="date" className={`bg-transparent text-xs ${theme.textMain} focus:outline-none`} value={dateFilter.end} onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})} />
+                  </div>
+               </div>
+
+               {isComparing && (
+                 <>
+                  <div className="h-8 w-px bg-slate-800/50 hidden md:block" />
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-[200px] border-l-2 border-indigo-500 pl-4">
+                    <label className="text-[10px] font-bold text-indigo-500 uppercase">Período de Comparação</label>
+                    <div className="flex items-center gap-2">
+                      <input type="date" className={`bg-transparent text-xs ${theme.textMain} focus:outline-none`} value={compDateFilter.start} onChange={(e) => setCompDateFilter({...compDateFilter, start: e.target.value})} />
+                      <span className="text-slate-600">→</span>
+                      <input type="date" className={`bg-transparent text-xs ${theme.textMain} focus:outline-none`} value={compDateFilter.end} onChange={(e) => setCompDateFilter({...compDateFilter, end: e.target.value})} />
+                    </div>
+                  </div>
+                 </>
+               )}
+            </div>
+          )}
+        </header>
+
+        {/* --- DASHBOARD --- */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Cards de Métricas Principais */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card title="Vendas Concluídas" value={mainTotals.fechado} compareValue={compTotals?.fechado} icon={CheckCircle2} color="bg-emerald-500" subValue="Performance Final" />
+              <Card title="Conversão Real" value={`${((mainTotals.fechado / (mainTotals.total || 1)) * 100).toFixed(1)}%`} compareValue={compTotals ? ((compTotals.fechado / (compTotals.total || 1)) * 100).toFixed(1) : null} icon={Target} color="bg-indigo-500" subValue="Efetividade" />
+              <Card title="Pipeline Ativo" value={mainTotals.negociacao} compareValue={compTotals?.negociacao} icon={MessageSquare} color="bg-amber-500" subValue="Em negociação" />
+              <Card title="Volume Total" value={mainTotals.total} compareValue={compTotals?.total} icon={Users} color="bg-slate-500" subValue="Interações totais" />
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className={`${theme.card} border rounded-2xl p-6 shadow-xl`}>
+                <h4 className={`font-bold ${theme.textMain} mb-6 flex items-center gap-2`}>Mix de Status</h4>
+                <div className="h-[250px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={Object.keys(STATUS_CONFIG).map(k => ({ name: STATUS_CONFIG[k].label, value: mainTotals[k], color: STATUS_CONFIG[k].color })).filter(d => d.value > 0)} innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value" stroke="none">
+                        {Object.keys(STATUS_CONFIG).map((k, i) => <Cell key={i} fill={STATUS_CONFIG[k].color} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: isDarkMode ? '#0f172a' : '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className={`lg:col-span-2 ${theme.card} border rounded-2xl p-6 shadow-xl`}>
+                <h4 className={`font-bold ${theme.textMain} mb-6 flex items-center gap-2`}>Comparativo de Volume</h4>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={Object.keys(STATUS_CONFIG).map(k => ({ name: STATUS_CONFIG[k].label.split(' ')[0], atual: mainTotals[k], anterior: compTotals ? compTotals[k] : 0 }))}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={10} axisLine={false} tickLine={false} />
+                      <Tooltip cursor={{ fill: isDarkMode ? '#1e293b' : '#f1f5f9' }} />
+                      <Bar dataKey="atual" fill="#6366f1" radius={[4, 4, 0, 0]} name="Período Principal" />
+                      {isComparing && <Bar dataKey="anterior" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Período Anterior" />}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- INSERIR DADOS (ESTILO FORM EXECUTIVO) --- */}
+        {activeTab === 'entry' && (
+          <div className="max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+            <div className={`${theme.card} border rounded-3xl p-8 shadow-2xl`}>
+              <form onSubmit={handleSave} className="space-y-8">
+                <div>
+                  <label className={`block text-[10px] font-black ${theme.textMuted} uppercase tracking-[0.2em] mb-4`}>Responsável pela Operação</label>
+                  <div className="flex flex-wrap gap-3">
+                    {CONSULTANTS_INITIAL.map(c => (
+                      <button key={c} type="button" onClick={() => setActiveConsultant(c)} className={`px-5 py-2.5 rounded-xl text-xs font-bold border transition-all ${activeConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : `${theme.input} hover:border-indigo-500`}`}>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {Object.keys(STATUS_CONFIG).map((key) => {
+                    const Config = STATUS_CONFIG[key];
+                    return (
+                      <div key={key} className="space-y-2">
+                        <label className={`flex items-center gap-2 text-xs font-bold ${theme.textMuted}`}>
+                          <Config.icon className="w-3.5 h-3.5" style={{ color: Config.color }} /> {Config.label}
+                        </label>
+                        <input type="number" min="0" value={formData[key]} onChange={(e) => setFormData({...formData, [key]: parseInt(e.target.value) || 0})} className={`w-full ${theme.input} rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-mono text-lg font-bold`} />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-indigo-600/30 transition-all transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3">
+                  <Save className="w-5 h-5" /> SALVAR REGISTRO
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- HISTÓRICO --- */}
+        {activeTab === 'data' && (
+          <div className="animate-in fade-in duration-500">
+             <div className={`${theme.card} border rounded-2xl overflow-hidden shadow-xl`}>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-left">
+                   <thead className={`${isDarkMode ? 'bg-slate-950/50' : 'bg-slate-50'} text-[10px] uppercase ${theme.textMuted} tracking-widest border-b ${theme.border}`}>
+                     <tr>
+                       <th className="px-6 py-4">Data</th>
+                       <th className="px-6 py-4">Consultor</th>
+                       {Object.values(STATUS_CONFIG).map(s => <th key={s.label} className="px-6 py-4 text-center">{s.label.split(' ')[0]}</th>)}
+                       <th className="px-6 py-4 text-right">Ação</th>
+                     </tr>
+                   </thead>
+                   <tbody className={`divide-y ${theme.border} text-sm`}>
+                     {data.map((item) => (
+                       <tr key={item.id} className={`${theme.hover} transition-colors`}>
+                         <td className="px-6 py-4 font-mono text-xs">{new Date(item.date).toLocaleDateString()}</td>
+                         <td className={`px-6 py-4 font-bold ${theme.textMain}`}>{item.consultant}</td>
+                         {Object.keys(STATUS_CONFIG).map(k => <td key={k} className="px-6 py-4 text-center font-bold">{item.stats[k]}</td>)}
+                         <td className="px-6 py-4 text-right">
+                           <button onClick={() => setData(data.filter(i => i.id !== item.id))} className="text-slate-600 hover:text-red-500 transition-colors">
+                             <Trash2 className="w-4 h-4" />
+                           </button>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+                 {data.length === 0 && <div className="py-20 text-center text-slate-500">Nenhum dado para exibir.</div>}
+               </div>
+             </div>
+          </div>
+        )}
+      </main>
+
+      {/* Nav Mobile */}
+      <nav className={`lg:hidden fixed bottom-0 left-0 right-0 ${isDarkMode ? 'bg-slate-950/90' : 'bg-white/90'} backdrop-blur-md border-t ${theme.border} flex justify-around p-4 z-50`}>
+        <button onClick={() => setActiveTab('dashboard')} className={`p-2 ${activeTab === 'dashboard' ? 'text-indigo-500' : 'text-slate-500'}`}><LayoutDashboard /></button>
+        <button onClick={() => setActiveTab('entry')} className={`p-2 ${activeTab === 'entry' ? 'text-indigo-500' : 'text-slate-500'}`}><PlusCircle /></button>
+        <button onClick={() => setActiveTab('data')} className={`p-2 ${activeTab === 'data' ? 'text-indigo-500' : 'text-slate-500'}`}><BarChart3 /></button>
+        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 text-slate-500">{isDarkMode ? <Sun /> : <Moon />}</button>
+      </nav>
+    </div>
+  );
+};
+
+export default App;
