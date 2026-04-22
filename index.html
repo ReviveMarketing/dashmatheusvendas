@@ -1,1098 +1,378 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sales Intelligence Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>
-  :root {
-    --bg-base: #0a0c10;
-    --bg-surface: #111318;
-    --bg-card: #161920;
-    --bg-elevated: #1c2028;
-    --border: rgba(255,255,255,0.07);
-    --border-accent: rgba(255,255,255,0.12);
-    --text-primary: #f0f2f7;
-    --text-secondary: #8a9bb5;
-    --text-muted: #4a5568;
-    --accent: #4f8ef7;
-    --accent-glow: rgba(79,142,247,0.15);
-    --green: #34d399;
-    --green-bg: rgba(52,211,153,0.1);
-    --amber: #fbbf24;
-    --amber-bg: rgba(251,191,36,0.1);
-    --red: #f87171;
-    --red-bg: rgba(248,113,113,0.1);
-    --purple: #a78bfa;
-    --purple-bg: rgba(167,139,250,0.1);
-    --teal: #2dd4bf;
-    --teal-bg: rgba(45,212,191,0.1);
-    --coral: #fb923c;
-    --coral-bg: rgba(251,146,60,0.1);
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
-    --shadow: 0 4px 24px rgba(0,0,0,0.4);
-  }
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area 
+} from 'recharts';
+import { 
+  Users, TrendingUp, Target, Award, Download, Plus, Filter, 
+  ChevronRight, Calendar, BarChart2, Trash2, Save, UserPlus, X
+} from 'lucide-react';
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+// --- Constantes e Configurações ---
+const STATUS_OPTIONS = [
+  { id: 'aguardando', label: 'Aguardando Resposta', color: '#6366f1' },
+  { id: 'fechado', label: 'Fechado', color: '#10b981' },
+  { id: 'negociacao', label: 'Negociação', color: '#f59e0b' },
+  { id: 'sem_dados', label: 'Sem Dados', color: '#64748b' },
+  { id: 'sem_possibilidade', label: 'Sem Possibilidade', color: '#ef4444' },
+  { id: 'visita', label: 'Visita Corriqueira', color: '#8b5cf6' },
+];
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg-base);
-    color: var(--text-primary);
-    min-height: 100vh;
-    font-size: 14px;
-    line-height: 1.6;
-  }
+const DEFAULT_CONSULTANTS = ["André Silva", "Beatriz Costa", "Carlos Eduardo", "Daniela Martins"];
 
-  /* LAYOUT */
-  .app { display: flex; flex-direction: column; min-height: 100vh; }
+const App = () => {
+  // --- Estados ---
+  const [data, setData] = useState([]);
+  const [consultants, setConsultants] = useState([]);
+  const [newConsultantName, setNewConsultantName] = useState('');
+  const [selectedConsultant, setSelectedConsultant] = useState('');
+  const [formData, setFormData] = useState({
+    aguardando: 0,
+    fechado: 0,
+    negociacao: 0,
+    sem_dados: 0,
+    sem_possibilidade: 0,
+    visita: 0,
+  });
+  const [filterConsultant, setFilterConsultant] = useState('Todos');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
-  /* HEADER */
-  .header {
-    padding: 18px 32px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg-surface);
-    position: sticky; top: 0; z-index: 100;
-  }
-  .header-brand { display: flex; align-items: center; gap: 12px; }
-  .header-logo {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: linear-gradient(135deg, var(--accent), var(--purple));
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px;
-  }
-  .header-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
-  .header-subtitle { font-size: 12px; color: var(--text-secondary); }
-  .header-actions { display: flex; gap: 10px; align-items: center; }
+  // --- Carregamento e Persistência ---
+  useEffect(() => {
+    const savedData = localStorage.getItem('executive_dashboard_data');
+    if (savedData) setData(JSON.parse(savedData));
+    
+    const savedConsultants = localStorage.getItem('executive_consultants');
+    if (savedConsultants) {
+      const parsed = JSON.parse(savedConsultants);
+      setConsultants(parsed);
+      if (parsed.length > 0) setSelectedConsultant(parsed[0]);
+    } else {
+      setConsultants(DEFAULT_CONSULTANTS);
+      setSelectedConsultant(DEFAULT_CONSULTANTS[0]);
+    }
+  }, []);
 
-  /* TABS */
-  .tabs {
-    display: flex; gap: 4px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 4px;
-  }
-  .tab-btn {
-    padding: 7px 16px;
-    border: none; background: none;
-    color: var(--text-secondary); cursor: pointer;
-    border-radius: var(--radius-sm);
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-    transition: all 0.2s;
-  }
-  .tab-btn.active { background: var(--accent); color: #fff; }
-  .tab-btn:hover:not(.active) { background: var(--bg-elevated); color: var(--text-primary); }
+  useEffect(() => {
+    localStorage.setItem('executive_dashboard_data', JSON.stringify(data));
+  }, [data]);
 
-  .btn {
-    padding: 8px 16px;
-    border-radius: var(--radius-sm);
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all 0.2s; border: 1px solid var(--border-accent);
-    background: var(--bg-elevated); color: var(--text-primary);
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn:hover { background: var(--bg-card); border-color: rgba(255,255,255,0.2); }
-  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn-primary:hover { background: #3a7de8; }
-  .btn-danger { background: var(--red-bg); border-color: rgba(248,113,113,0.3); color: var(--red); }
-  .btn-danger:hover { background: rgba(248,113,113,0.2); }
-  .btn-success { background: var(--green-bg); border-color: rgba(52,211,153,0.3); color: var(--green); }
-  .btn-success:hover { background: rgba(52,211,153,0.2); }
+  useEffect(() => {
+    localStorage.setItem('executive_consultants', JSON.stringify(consultants));
+  }, [consultants]);
 
-  /* MAIN */
-  .main { flex: 1; }
+  // --- Lógica de Consultores ---
+  const handleAddConsultant = () => {
+    if (!newConsultantName.trim()) return;
+    if (consultants.includes(newConsultantName.trim())) return;
+    
+    const updated = [...consultants, newConsultantName.trim()];
+    setConsultants(updated);
+    setNewConsultantName('');
+    if (consultants.length === 0) setSelectedConsultant(newConsultantName.trim());
+  };
 
-  /* VIEWS */
-  .view { display: none; }
-  .view.active { display: block; }
+  const handleRemoveConsultant = (name) => {
+    const updated = consultants.filter(c => c !== name);
+    setConsultants(updated);
+    if (selectedConsultant === name) {
+      setSelectedConsultant(updated[0] || '');
+    }
+  };
 
-  /* DASHBOARD VIEW */
-  .dashboard-layout { padding: 28px 32px; display: flex; flex-direction: column; gap: 24px; }
+  // --- Lógica de Negócio ---
+  const handleSave = () => {
+    if (!selectedConsultant) return;
+    const newEntry = {
+      id: Date.now(),
+      consultant: selectedConsultant,
+      date: new Date().toISOString(),
+      values: { ...formData }
+    };
+    setData([newEntry, ...data]);
+    setFormData({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
+    setActiveTab('dashboard');
+  };
 
-  /* FILTER BAR */
-  .filter-bar {
-    display: flex; gap: 12px; align-items: center;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 14px 20px;
-    flex-wrap: wrap;
-  }
-  .filter-bar label { font-size: 12px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-  .filter-bar select {
-    background: var(--bg-card); border: 1px solid var(--border);
-    color: var(--text-primary); padding: 7px 12px;
-    border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 13px;
-    cursor: pointer;
-  }
-  .filter-bar select:focus { outline: none; border-color: var(--accent); }
-  .filter-sep { width: 1px; height: 24px; background: var(--border); }
+  const deleteRecord = (id) => {
+    setData(data.filter(item => item.id !== id));
+  };
 
-  /* KPI CARDS */
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
-  .kpi-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    position: relative; overflow: hidden;
-    transition: border-color 0.2s, transform 0.15s;
-  }
-  .kpi-card:hover { border-color: var(--border-accent); transform: translateY(-2px); }
-  .kpi-card::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  }
-  .kpi-card.blue::before { background: var(--accent); }
-  .kpi-card.green::before { background: var(--green); }
-  .kpi-card.amber::before { background: var(--amber); }
-  .kpi-card.purple::before { background: var(--purple); }
-  .kpi-card.red::before { background: var(--red); }
-  .kpi-card.teal::before { background: var(--teal); }
-  .kpi-icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px; margin-bottom: 12px;
-  }
-  .kpi-card.blue .kpi-icon { background: var(--accent-glow); }
-  .kpi-card.green .kpi-icon { background: var(--green-bg); }
-  .kpi-card.amber .kpi-icon { background: var(--amber-bg); }
-  .kpi-card.purple .kpi-icon { background: var(--purple-bg); }
-  .kpi-card.red .kpi-icon { background: var(--red-bg); }
-  .kpi-card.teal .kpi-icon { background: var(--teal-bg); }
-  .kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 500; margin-bottom: 4px; }
-  .kpi-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 700; line-height: 1.1; }
-  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  const filteredData = useMemo(() => {
+    return filterConsultant === 'Todos' ? data : data.filter(d => d.consultant === filterConsultant);
+  }, [data, filterConsultant]);
 
-  /* CHARTS GRID */
-  .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-  .charts-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-  .chart-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-  }
-  .chart-card.full { grid-column: 1 / -1; }
-  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .chart-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; }
-  .chart-meta { font-size: 12px; color: var(--text-secondary); }
-  .chart-body { position: relative; }
+  const aggregateByConsultant = useMemo(() => {
+    const map = {};
+    data.forEach(entry => {
+      if (!map[entry.consultant]) {
+        map[entry.consultant] = { name: entry.consultant, fechado: 0, total: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
+      }
+      Object.keys(entry.values).forEach(key => {
+        map[entry.consultant][key] += Number(entry.values[key]);
+        map[entry.consultant].total += Number(entry.values[key]);
+      });
+    });
+    return Object.values(map);
+  }, [data]);
 
-  /* RANKING */
-  .ranking-list { display: flex; flex-direction: column; gap: 10px; }
-  .ranking-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    transition: border-color 0.2s;
-  }
-  .ranking-item:hover { border-color: var(--border-accent); }
-  .ranking-item.first { border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.05); }
-  .rank-badge {
-    width: 28px; height: 28px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px;
-    background: var(--bg-elevated); color: var(--text-secondary);
-    flex-shrink: 0;
-  }
-  .rank-badge.gold { background: rgba(251,191,36,0.15); color: var(--amber); }
-  .rank-badge.silver { background: rgba(148,163,184,0.15); color: #94a3b8; }
-  .rank-badge.bronze { background: rgba(251,146,60,0.15); color: var(--coral); }
-  .rank-avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 600; font-size: 12px; flex-shrink: 0;
-  }
-  .rank-info { flex: 1; min-width: 0; }
-  .rank-name { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rank-details { font-size: 11px; color: var(--text-secondary); }
-  .rank-score {
-    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
-    text-align: right; flex-shrink: 0;
-  }
-  .rank-bar-wrap { width: 80px; height: 4px; background: var(--bg-elevated); border-radius: 2px; margin-top: 4px; }
-  .rank-bar { height: 4px; border-radius: 2px; background: var(--accent); }
+  const statusTotals = useMemo(() => {
+    const totals = STATUS_OPTIONS.map(s => ({ name: s.label, value: 0, color: s.color, id: s.id }));
+    filteredData.forEach(entry => {
+      STATUS_OPTIONS.forEach((opt, idx) => {
+        totals[idx].value += Number(entry.values[opt.id]);
+      });
+    });
+    return totals.filter(t => t.value > 0);
+  }, [filteredData]);
 
-  /* STATUS BADGES */
-  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .status-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-  }
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .status-name { font-size: 12px; color: var(--text-secondary); flex: 1; }
-  .status-count { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px; }
+  const timelineData = useMemo(() => {
+    return [...filteredData]
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(d => ({
+        date: new Date(d.date).toLocaleDateString('pt-BR'),
+        fechado: d.values.fechado,
+        total: Object.values(d.values).reduce((a, b) => a + Number(b), 0)
+      }));
+  }, [filteredData]);
 
-  /* DATA ENTRY VIEW */
-  .entry-layout { max-width: 860px; margin: 0 auto; padding: 32px; }
-  .entry-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 32px;
-  }
-  .entry-header { margin-bottom: 28px; }
-  .entry-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-  .entry-subtitle { color: var(--text-secondary); font-size: 13px; }
+  const stats = useMemo(() => {
+    const totalFechado = filteredData.reduce((acc, curr) => acc + Number(curr.values.fechado), 0);
+    const totalLeads = filteredData.reduce((acc, curr) => acc + Object.values(curr.values).reduce((a, b) => a + Number(b), 0), 0);
+    const conversion = totalLeads > 0 ? ((totalFechado / totalLeads) * 100).toFixed(1) : 0;
+    const top = [...aggregateByConsultant].sort((a, b) => b.fechado - a.fechado)[0];
+    return { totalFechado, totalLeads, conversion, topConsultant: top?.name || "N/A" };
+  }, [filteredData, aggregateByConsultant]);
 
-  .form-section { margin-bottom: 28px; }
-  .form-section-label {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
-    color: var(--text-secondary); font-weight: 600; margin-bottom: 14px;
-    padding-bottom: 8px; border-bottom: 1px solid var(--border);
-  }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .form-group { display: flex; flex-direction: column; gap: 6px; }
-  .form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
-  .form-input, .form-select {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    padding: 10px 14px;
-    border-radius: var(--radius-md);
-    font-family: 'DM Sans', sans-serif; font-size: 14px;
-    transition: border-color 0.2s;
-  }
-  .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-  .form-select { cursor: pointer; }
+  const exportToCSV = () => {
+    const headers = ["Consultor,Data,Aguardando,Fechado,Negociacao,Sem Dados,Sem Possibilidade,Visita\n"];
+    const rows = data.map(d => 
+      `${d.consultant},${new Date(d.date).toLocaleDateString()},${d.values.aguardando},${d.values.fechado},${d.values.negociacao},${d.values.sem_dados},${d.values.sem_possibilidade},${d.values.visita}`
+    );
+    const blob = new Blob([headers + rows.join("\n")], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'relatorio_vendas.csv');
+    a.click();
+  };
 
-  .status-inputs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .status-input-item { display: flex; flex-direction: column; gap: 6px; }
-  .status-input-label {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 12px; font-weight: 500;
-  }
-  .status-color { width: 8px; height: 8px; border-radius: 50%; }
-  .status-number-input {
-    background: var(--bg-card); border: 1px solid var(--border);
-    color: var(--text-primary); padding: 10px 12px;
-    border-radius: var(--radius-md); font-family: 'DM Sans', sans-serif;
-    font-size: 20px; font-weight: 600; text-align: center;
-    transition: border-color 0.2s; width: 100%;
-  }
-  .status-number-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-  .form-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
-
-  /* HISTORY VIEW */
-  .history-layout { padding: 28px 32px; }
-  .history-table-wrap { overflow-x: auto; }
-  .history-table {
-    width: 100%; border-collapse: collapse;
-    font-size: 13px;
-  }
-  .history-table th {
-    text-align: left; padding: 10px 14px;
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-    color: var(--text-secondary); font-weight: 600;
-    border-bottom: 1px solid var(--border);
-  }
-  .history-table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-  .history-table tr:last-child td { border-bottom: none; }
-  .history-table tr:hover td { background: var(--bg-elevated); }
-  .pill {
-    display: inline-block; padding: 3px 10px;
-    border-radius: 20px; font-size: 11px; font-weight: 500;
-  }
-
-  /* TOAST */
-  .toast {
-    position: fixed; bottom: 28px; right: 28px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-accent);
-    border-radius: var(--radius-md);
-    padding: 14px 20px;
-    font-size: 13px; font-weight: 500;
-    display: flex; align-items: center; gap: 10px;
-    box-shadow: var(--shadow);
-    transform: translateY(100px); opacity: 0;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    z-index: 1000;
-  }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.success { border-color: rgba(52,211,153,0.4); }
-  .toast.error { border-color: rgba(248,113,113,0.4); }
-  .toast-icon { font-size: 16px; }
-
-  /* EMPTY STATE */
-  .empty-state {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 60px 20px;
-    color: var(--text-muted); gap: 12px; text-align: center;
-  }
-  .empty-icon { font-size: 40px; opacity: 0.5; }
-  .empty-text { font-size: 15px; color: var(--text-secondary); }
-  .empty-sub { font-size: 13px; }
-
-  /* BEST BADGE */
-  .best-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3);
-    color: var(--amber); padding: 2px 8px; border-radius: 20px;
-    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
-  }
-
-  /* SECTION DIVIDER */
-  .section-title {
-    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
-    color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px;
-    margin-bottom: 14px;
-  }
-
-  /* PROGRESS BAR */
-  .progress-wrap { height: 6px; background: var(--bg-elevated); border-radius: 3px; overflow: hidden; }
-  .progress-bar { height: 6px; border-radius: 3px; background: var(--accent); transition: width 0.5s; }
-
-  /* RESPONSIVE */
-  @media (max-width: 768px) {
-    .header { padding: 14px 16px; }
-    .dashboard-layout { padding: 16px; }
-    .charts-grid { grid-template-columns: 1fr; }
-    .charts-grid-3 { grid-template-columns: 1fr; }
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .form-row { grid-template-columns: 1fr; }
-    .status-inputs { grid-template-columns: repeat(2, 1fr); }
-    .entry-layout { padding: 16px; }
-    .entry-card { padding: 20px; }
-    .history-layout { padding: 16px; }
-  }
-
-  /* LEGEND */
-  .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
-
-  /* CONSULTANT AVATAR COLORS */
-  .av-0 { background: rgba(79,142,247,0.2); color: var(--accent); }
-  .av-1 { background: rgba(167,139,250,0.2); color: var(--purple); }
-  .av-2 { background: rgba(52,211,153,0.2); color: var(--green); }
-  .av-3 { background: rgba(251,191,36,0.2); color: var(--amber); }
-  .av-4 { background: rgba(248,113,113,0.2); color: var(--red); }
-  .av-5 { background: rgba(45,212,191,0.2); color: var(--teal); }
-  .av-6 { background: rgba(251,146,60,0.2); color: var(--coral); }
-  .av-7 { background: rgba(129,140,248,0.2); color: #818cf8; }
-</style>
-</head>
-<body>
-<div class="app">
-
-  <!-- HEADER -->
-  <header class="header">
-    <div class="header-brand">
-      <div class="header-logo">SI</div>
-      <div>
-        <div class="header-title">Sales Intelligence</div>
-        <div class="header-subtitle">Painel de Desempenho por Consultor</div>
+  const Card = ({ title, children, icon: Icon, className = "" }) => (
+    <div className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl ${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-slate-400 font-medium text-sm uppercase tracking-wider">{title}</h3>
+        {Icon && <Icon className="text-indigo-500 w-5 h-5" />}
       </div>
+      {children}
     </div>
-    <div class="header-actions">
-      <div class="tabs">
-        <button class="tab-btn active" onclick="showView('dashboard')">Dashboard</button>
-        <button class="tab-btn" onclick="showView('entry')">Entrada de Dados</button>
-        <button class="tab-btn" onclick="showView('history')">Histórico</button>
-      </div>
-      <button class="btn" onclick="exportData('csv')">⬇ CSV</button>
-      <button class="btn" onclick="exportData('json')">⬇ JSON</button>
-    </div>
-  </header>
+  );
 
-  <!-- MAIN -->
-  <main class="main">
-
-    <!-- DASHBOARD VIEW -->
-    <div id="view-dashboard" class="view active">
-      <div class="dashboard-layout">
-
-        <!-- FILTER BAR -->
-        <div class="filter-bar">
-          <label>Consultor</label>
-          <select id="filter-consultor" onchange="updateDashboard()">
-            <option value="all">Todos os Consultores</option>
-          </select>
-          <div class="filter-sep"></div>
-          <label>Status</label>
-          <select id="filter-status" onchange="updateDashboard()">
-            <option value="all">Todos os Status</option>
-            <option value="Fechado">Fechado</option>
-            <option value="Negociação">Negociação</option>
-            <option value="Aguardando Resposta">Aguardando Resposta</option>
-            <option value="Sem Dados">Sem Dados</option>
-            <option value="Sem Possibilidade">Sem Possibilidade</option>
-            <option value="Visita Corriqueira">Visita Corriqueira</option>
-          </select>
-          <div class="filter-sep"></div>
-          <label>Período</label>
-          <select id="filter-period" onchange="updateDashboard()">
-            <option value="all">Todo o Período</option>
-            <option value="today">Hoje</option>
-            <option value="week">Últimos 7 dias</option>
-            <option value="month">Últimos 30 dias</option>
-          </select>
-          <div style="margin-left: auto;">
-            <button class="btn btn-danger" onclick="confirmClear()">🗑 Limpar Tudo</button>
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30">
+      <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50">
+        <div className="p-6 mb-8 flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <TrendingUp className="text-white w-6 h-6" />
           </div>
+          <span className="hidden md:block font-bold text-xl tracking-tight">Vendas<span className="text-indigo-500">Pro</span></span>
         </div>
-
-        <!-- KPI CARDS -->
-        <div class="kpi-grid" id="kpi-grid"></div>
-
-        <!-- CHARTS ROW 1 -->
-        <div class="charts-grid">
-          <div class="chart-card">
-            <div class="chart-header">
-              <div class="chart-title">Distribuição por Status</div>
-              <div class="chart-meta" id="bar-meta"></div>
-            </div>
-            <div class="chart-legend" id="bar-legend"></div>
-            <div class="chart-body" style="height: 240px;">
-              <canvas id="chartBar" role="img" aria-label="Gráfico de barras por status"></canvas>
-            </div>
-          </div>
-          <div class="chart-card">
-            <div class="chart-header">
-              <div class="chart-title">Proporção por Status</div>
-            </div>
-            <div class="chart-body" style="height: 200px;">
-              <canvas id="chartPie" role="img" aria-label="Gráfico de pizza por status"></canvas>
-            </div>
-            <div class="chart-legend" id="pie-legend" style="margin-top: 12px;"></div>
-          </div>
+        <div className="flex-1 px-4 space-y-2">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
+            { id: 'input', label: 'Novo Registro', icon: Plus },
+            { id: 'records', label: 'Histórico', icon: Calendar },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${
+                activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <item.icon size={20} />
+              <span className="hidden md:block font-medium">{item.label}</span>
+            </button>
+          ))}
         </div>
-
-        <!-- CHARTS ROW 2 -->
-        <div class="charts-grid">
-          <div class="chart-card">
-            <div class="chart-header">
-              <div class="chart-title">Evolução ao Longo do Tempo</div>
-              <div class="chart-meta" id="line-meta"></div>
-            </div>
-            <div class="chart-legend" id="line-legend"></div>
-            <div class="chart-body" style="height: 240px;">
-              <canvas id="chartLine" role="img" aria-label="Gráfico de linha por período"></canvas>
-            </div>
-          </div>
-          <div class="chart-card">
-            <div class="chart-header">
-              <div class="chart-title">Comparativo por Consultor</div>
-            </div>
-            <div class="chart-body" id="ranking-body"></div>
-          </div>
+        <div className="p-4 border-t border-slate-800">
+           <button onClick={exportToCSV} className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
+            <Download size={20} />
+            <span className="hidden md:block">Exportar Dados</span>
+          </button>
         </div>
+      </nav>
 
-        <!-- STATUS BREAKDOWN + RANKING -->
-        <div class="charts-grid">
-          <div class="chart-card">
-            <div class="chart-header"><div class="chart-title">Breakdown por Status</div></div>
-            <div class="status-grid" id="status-breakdown"></div>
+      <main className="pl-20 md:pl-64 transition-all duration-300">
+        <header className="p-6 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Relatório Executivo</h1>
+            <p className="text-slate-400 mt-1">Visão geral do desempenho comercial e status de leads.</p>
           </div>
-          <div class="chart-card">
-            <div class="chart-header">
-              <div class="chart-title">Ranking de Consultores</div>
+          <div className="flex items-center gap-3">
+             <div className="relative group">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+              <select 
+                value={filterConsultant}
+                onChange={(e) => setFilterConsultant(e.target.value)}
+                className="bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-8 py-2.5 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+              >
+                <option value="Todos">Todos os Consultores</option>
+                {consultants.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-            <div id="full-ranking"></div>
           </div>
-        </div>
+        </header>
 
-      </div>
-    </div>
-
-    <!-- ENTRY VIEW -->
-    <div id="view-entry" class="view">
-      <div class="entry-layout">
-        <div class="entry-card">
-          <div class="entry-header">
-            <div class="entry-title">Registrar Dados do Consultor</div>
-            <div class="entry-subtitle">Preencha os campos abaixo e salve o registro.</div>
-          </div>
-
-          <div class="form-section">
-            <div class="form-section-label">Identificação</div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Consultor</label>
-                <select id="entry-consultor" class="form-select">
-                  <option value="">Selecionar consultor...</option>
-                </select>
+        <div className="px-6 md:px-10 pb-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {activeTab === 'dashboard' && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card title="Total de Leads" icon={Users}><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
+                <Card title="Fechamentos" icon={Target}><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
+                <Card title="Taxa de Conversão" icon={TrendingUp}><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
+                <Card title="Top Consultor" icon={Award}><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
               </div>
-              <div class="form-group">
-                <label class="form-label">Novo Consultor (opcional)</label>
-                <input type="text" id="entry-new-consultor" class="form-input" placeholder="Digite nome para criar novo...">
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card title="Status Geral" className="lg:col-span-1">
+                  <div className="h-64">
+                    <ResponsiveContainer><PieChart><Pie data={statusTotals} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{statusTotals.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/></PieChart></ResponsiveContainer>
+                  </div>
+                </Card>
+                <Card title="Comparativo por Consultor" className="lg:col-span-2">
+                  <div className="h-72">
+                    <ResponsiveContainer><BarChart data={aggregateByConsultant}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} /><XAxis dataKey="name" stroke="#64748b" /><YAxis stroke="#64748b" /><Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/><Legend /><Bar dataKey="fechado" name="Fechado" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="negociacao" name="Em Negociação" fill="#f59e0b" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+                  </div>
+                </Card>
+              </div>
+              <Card title="Evolução Temporal">
+                <div className="h-64">
+                  <ResponsiveContainer><AreaChart data={timelineData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="date" stroke="#64748b" /><YAxis stroke="#64748b" /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/><Area type="monotone" dataKey="fechado" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={3} /></AreaChart></ResponsiveContainer>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {activeTab === 'input' && (
+            <div className="max-w-4xl mx-auto space-y-8">
+              {/* Gerenciamento de Consultores */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+                <h2 className="text-xl font-bold flex items-center gap-3 mb-6">
+                  <Users className="text-indigo-500" /> Gerenciar Consultores
+                </h2>
+                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                  <input 
+                    type="text"
+                    value={newConsultantName}
+                    onChange={(e) => setNewConsultantName(e.target.value)}
+                    placeholder="Nome do novo consultor..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                  <button 
+                    onClick={handleAddConsultant}
+                    className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-all"
+                  >
+                    <UserPlus size={20} /> Adicionar
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {consultants.map(c => (
+                    <div key={c} className="flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full group">
+                      <span className="text-sm font-medium">{c}</span>
+                      <button onClick={() => handleRemoveConsultant(c)} className="text-slate-500 hover:text-red-400 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {consultants.length === 0 && <p className="text-slate-500 italic text-sm">Nenhum consultor cadastrado.</p>}
+                </div>
+              </div>
+
+              {/* Registro de Dados */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                <div className="bg-indigo-600/10 p-8 border-b border-slate-800">
+                  <h2 className="text-2xl font-bold flex items-center gap-3">
+                    <Plus className="text-indigo-500" /> Inserir Novo Registro
+                  </h2>
+                </div>
+                <div className="p-8 space-y-8">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">Consultor Responsável</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {consultants.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => setSelectedConsultant(c)}
+                          className={`py-3 px-4 rounded-xl text-sm font-medium transition-all border ${
+                            selectedConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {STATUS_OPTIONS.map(status => (
+                      <div key={status.id} className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-300 flex items-center justify-between">
+                          {status.label}
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData[status.id]}
+                          onChange={(e) => setFormData({ ...formData, [status.id]: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-6">
+                    <button
+                      onClick={handleSave}
+                      disabled={!selectedConsultant}
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+                    >
+                      <Save size={20} /> Salvar Relatório
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <div class="form-section">
-            <div class="form-section-label">Distribuição por Status</div>
-            <div class="status-inputs" id="status-inputs-container"></div>
-          </div>
-
-          <div class="form-section">
-            <div class="form-section-label">Observações</div>
-            <textarea id="entry-obs" class="form-input" rows="3" placeholder="Observações adicionais (opcional)..." style="resize: vertical; width: 100%;"></textarea>
-          </div>
-
-          <div class="form-actions">
-            <button class="btn" onclick="clearForm()">✕ Limpar</button>
-            <button class="btn btn-primary" onclick="saveEntry()">✓ Salvar Registro</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- HISTORY VIEW -->
-    <div id="view-history" class="view">
-      <div class="history-layout">
-        <div class="chart-card">
-          <div class="chart-header">
-            <div class="chart-title">Histórico de Registros</div>
-            <div style="display:flex;gap:10px;">
-              <button class="btn btn-danger" onclick="confirmClear()">🗑 Limpar Tudo</button>
+          {activeTab === 'records' && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-widest">
+                  <tr>
+                    <th className="px-6 py-4">Consultor</th>
+                    <th className="px-6 py-4">Data</th>
+                    <th className="px-6 py-4">Fechados</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {filteredData.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
+                      <td className="px-6 py-4 font-medium">{item.consultant}</td>
+                      <td className="px-6 py-4 text-slate-400">{new Date(item.date).toLocaleDateString('pt-BR')}</td>
+                      <td className="px-6 py-4"><span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded text-xs font-bold">{item.values.fechado}</span></td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => deleteRecord(item.id)} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div class="history-table-wrap" id="history-table-container"></div>
+          )}
         </div>
-      </div>
+      </main>
     </div>
-
-  </main>
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast">
-  <span class="toast-icon" id="toast-icon"></span>
-  <span id="toast-msg"></span>
-</div>
-
-<script>
-// ============================================================
-// CONFIG
-// ============================================================
-const STATUS_CONFIG = {
-  'Fechado':             { color: '#34d399', icon: '✓' },
-  'Negociação':          { color: '#4f8ef7', icon: '↔' },
-  'Aguardando Resposta': { color: '#fbbf24', icon: '⏳' },
-  'Sem Dados':           { color: '#8a9bb5', icon: '?' },
-  'Sem Possibilidade':   { color: '#f87171', icon: '✕' },
-  'Visita Corriqueira':  { color: '#a78bfa', icon: '🏠' },
+  );
 };
-const STATUSES = Object.keys(STATUS_CONFIG);
-const AVATAR_COLORS = ['av-0','av-1','av-2','av-3','av-4','av-5','av-6','av-7'];
-let chartBar = null, chartPie = null, chartLine = null;
 
-// ============================================================
-// DATA
-// ============================================================
-function getConsultores() {
-  return JSON.parse(localStorage.getItem('si_consultores') || '["Ana Silva","Carlos Mendes","Fernanda Lima"]');
-}
-function saveConsultores(c) { localStorage.setItem('si_consultores', JSON.stringify(c)); }
-function getEntries() { return JSON.parse(localStorage.getItem('si_entries') || '[]'); }
-function saveEntries(e) { localStorage.setItem('si_entries', JSON.stringify(e)); }
-
-// ============================================================
-// INIT
-// ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-  buildStatusInputs();
-  populateConsultorSelects();
-  updateDashboard();
-  renderHistory();
-});
-
-function buildStatusInputs() {
-  const c = document.getElementById('status-inputs-container');
-  c.innerHTML = STATUSES.map(s => `
-    <div class="status-input-item">
-      <div class="status-input-label">
-        <span class="status-color" style="background:${STATUS_CONFIG[s].color}"></span>
-        ${s}
-      </div>
-      <input type="number" min="0" value="0" class="status-number-input" id="si_${s.replace(/\s/g,'_')}">
-    </div>
-  `).join('');
-}
-
-function populateConsultorSelects() {
-  const cons = getConsultores();
-  ['entry-consultor','filter-consultor'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const isFilter = id.includes('filter');
-    const opts = isFilter ? '<option value="all">Todos os Consultores</option>' : '<option value="">Selecionar consultor...</option>';
-    el.innerHTML = opts + cons.map(c => `<option value="${c}">${c}</option>`).join('');
-  });
-}
-
-// ============================================================
-// VIEWS
-// ============================================================
-function showView(v) {
-  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-  document.getElementById('view-' + v).classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const views = ['dashboard','entry','history'];
-    b.classList.toggle('active', views[i] === v);
-  });
-  if (v === 'dashboard') updateDashboard();
-  if (v === 'history') renderHistory();
-}
-
-// ============================================================
-// SAVE ENTRY
-// ============================================================
-function saveEntry() {
-  let consultor = document.getElementById('entry-consultor').value;
-  const newC = document.getElementById('entry-new-consultor').value.trim();
-  if (newC) {
-    const cons = getConsultores();
-    if (!cons.includes(newC)) { cons.push(newC); saveConsultores(cons); }
-    consultor = newC;
-    populateConsultorSelects();
-  }
-  if (!consultor) { showToast('Selecione ou crie um consultor!', 'error'); return; }
-
-  const statusData = {};
-  let total = 0;
-  STATUSES.forEach(s => {
-    const v = parseInt(document.getElementById('si_' + s.replace(/\s/g,'_')).value) || 0;
-    statusData[s] = v; total += v;
-  });
-  if (total === 0) { showToast('Insira pelo menos um valor!', 'error'); return; }
-
-  const obs = document.getElementById('entry-obs').value.trim();
-  const entries = getEntries();
-  entries.push({
-    id: Date.now(),
-    date: new Date().toISOString(),
-    consultor,
-    status: statusData,
-    obs,
-    total
-  });
-  saveEntries(entries);
-  showToast('Registro salvo com sucesso!', 'success');
-  clearForm();
-  updateDashboard();
-}
-
-function clearForm() {
-  document.getElementById('entry-consultor').value = '';
-  document.getElementById('entry-new-consultor').value = '';
-  document.getElementById('entry-obs').value = '';
-  STATUSES.forEach(s => { document.getElementById('si_' + s.replace(/\s/g,'_')).value = 0; });
-}
-
-// ============================================================
-// FILTERS
-// ============================================================
-function getFilteredEntries() {
-  let entries = getEntries();
-  const fc = document.getElementById('filter-consultor')?.value || 'all';
-  const fp = document.getElementById('filter-period')?.value || 'all';
-  if (fc !== 'all') entries = entries.filter(e => e.consultor === fc);
-  if (fp !== 'all') {
-    const now = Date.now();
-    const days = fp === 'today' ? 1 : fp === 'week' ? 7 : 30;
-    entries = entries.filter(e => (now - new Date(e.date).getTime()) < days * 86400000);
-  }
-  return entries;
-}
-
-// ============================================================
-// DASHBOARD
-// ============================================================
-function updateDashboard() {
-  const entries = getFilteredEntries();
-  const totals = {};
-  STATUSES.forEach(s => totals[s] = 0);
-  let grandTotal = 0;
-  entries.forEach(e => { STATUSES.forEach(s => { totals[s] += (e.status[s] || 0); grandTotal += (e.status[s] || 0); }); });
-
-  const fechados = totals['Fechado'];
-  const negociacao = totals['Negociação'];
-  const semPoss = totals['Sem Possibilidade'];
-  const taxa = grandTotal > 0 ? ((fechados / grandTotal) * 100).toFixed(1) : 0;
-  const taxaNeg = grandTotal > 0 ? (((fechados + negociacao) / grandTotal) * 100).toFixed(1) : 0;
-
-  // KPIs
-  document.getElementById('kpi-grid').innerHTML = `
-    <div class="kpi-card blue"><div class="kpi-icon">📊</div><div class="kpi-label">Total Contatos</div><div class="kpi-value">${grandTotal}</div><div class="kpi-sub">${entries.length} registro(s)</div></div>
-    <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-label">Fechados</div><div class="kpi-value" style="color:var(--green)">${fechados}</div><div class="kpi-sub">Taxa: ${taxa}%</div></div>
-    <div class="kpi-card blue"><div class="kpi-icon">🤝</div><div class="kpi-label">Em Negociação</div><div class="kpi-value" style="color:var(--accent)">${negociacao}</div><div class="kpi-sub">${taxaNeg}% potencial</div></div>
-    <div class="kpi-card amber"><div class="kpi-icon">⏳</div><div class="kpi-label">Aguardando</div><div class="kpi-value" style="color:var(--amber)">${totals['Aguardando Resposta']}</div><div class="kpi-sub">Pendente follow-up</div></div>
-    <div class="kpi-card red"><div class="kpi-icon">✕</div><div class="kpi-label">Sem Possibilidade</div><div class="kpi-value" style="color:var(--red)">${semPoss}</div><div class="kpi-sub">${grandTotal > 0 ? ((semPoss/grandTotal)*100).toFixed(1) : 0}% do total</div></div>
-    <div class="kpi-card purple"><div class="kpi-icon">🏠</div><div class="kpi-label">Visita Corriqueira</div><div class="kpi-value" style="color:var(--purple)">${totals['Visita Corriqueira']}</div><div class="kpi-sub">Visitas registradas</div></div>
-  `;
-
-  renderBarChart(totals, entries);
-  renderPieChart(totals, grandTotal);
-  renderLineChart(entries);
-  renderComparativo(entries);
-  renderStatusBreakdown(totals, grandTotal);
-  renderFullRanking(entries);
-}
-
-// ============================================================
-// CHARTS
-// ============================================================
-function renderBarChart(totals, entries) {
-  const fc = document.getElementById('filter-consultor')?.value || 'all';
-  document.getElementById('bar-meta').textContent = fc === 'all' ? 'Todos os consultores' : fc;
-
-  const legend = document.getElementById('bar-legend');
-  legend.innerHTML = STATUSES.map(s => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${STATUS_CONFIG[s].color}"></div>
-      ${s}
-    </div>
-  `).join('');
-
-  const ctx = document.getElementById('chartBar').getContext('2d');
-  if (chartBar) chartBar.destroy();
-
-  const consultores = [...new Set(entries.map(e => e.consultor))];
-  if (consultores.length === 0 || fc !== 'all') {
-    // Single consultor or aggregate view
-    chartBar = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: STATUSES.map(s => s.length > 12 ? s.substring(0,12)+'…' : s),
-        datasets: [{
-          label: 'Quantidade',
-          data: STATUSES.map(s => totals[s]),
-          backgroundColor: STATUSES.map(s => STATUS_CONFIG[s].color + 'cc'),
-          borderColor: STATUSES.map(s => STATUS_CONFIG[s].color),
-          borderWidth: 1, borderRadius: 6,
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a9bb5', font: { size: 11 } } },
-          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a9bb5', stepSize: 1 } }
-        }
-      }
-    });
-  } else {
-    // Multi-consultor
-    chartBar = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: consultores,
-        datasets: STATUSES.map(s => ({
-          label: s,
-          data: consultores.map(c => {
-            return entries.filter(e => e.consultor === c).reduce((sum, e) => sum + (e.status[s] || 0), 0);
-          }),
-          backgroundColor: STATUS_CONFIG[s].color + 'bb',
-          borderColor: STATUS_CONFIG[s].color,
-          borderWidth: 1, borderRadius: 4,
-        }))
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a9bb5', font: { size: 11 } } },
-          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a9bb5', stepSize: 1 } }
-        }
-      }
-    });
-  }
-}
-
-function renderPieChart(totals, grandTotal) {
-  const ctx = document.getElementById('chartPie').getContext('2d');
-  if (chartPie) chartPie.destroy();
-
-  const vals = STATUSES.map(s => totals[s]);
-  const nonZero = vals.some(v => v > 0);
-
-  const legend = document.getElementById('pie-legend');
-  legend.innerHTML = STATUSES.map((s, i) => {
-    const pct = grandTotal > 0 ? ((totals[s]/grandTotal)*100).toFixed(1) : 0;
-    return `<div class="legend-item"><div class="legend-dot" style="background:${STATUS_CONFIG[s].color}"></div>${s} ${pct}%</div>`;
-  }).join('');
-
-  chartPie = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: STATUSES,
-      datasets: [{
-        data: nonZero ? vals : [1],
-        backgroundColor: nonZero ? STATUSES.map(s => STATUS_CONFIG[s].color + 'dd') : ['#2a2f3a'],
-        borderColor: nonZero ? STATUSES.map(s => STATUS_CONFIG[s].color) : ['#3a3f4a'],
-        borderWidth: 2, hoverOffset: 8,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      cutout: '65%',
-      plugins: { legend: { display: false }, tooltip: { callbacks: {
-        label: (ctx) => ` ${ctx.label}: ${ctx.raw} (${grandTotal > 0 ? ((ctx.raw/grandTotal)*100).toFixed(1) : 0}%)`
-      }}}
-    }
-  });
-}
-
-function renderLineChart(entries) {
-  const ctx = document.getElementById('chartLine').getContext('2d');
-  if (chartLine) chartLine.destroy();
-
-  // Group by date
-  const byDate = {};
-  entries.forEach(e => {
-    const d = e.date.substring(0, 10);
-    if (!byDate[d]) byDate[d] = {};
-    STATUSES.forEach(s => { byDate[d][s] = (byDate[d][s] || 0) + (e.status[s] || 0); });
-  });
-
-  const dates = Object.keys(byDate).sort();
-  document.getElementById('line-meta').textContent = dates.length + ' datas';
-
-  const legend = document.getElementById('line-legend');
-  legend.innerHTML = ['Fechado','Negociação','Aguardando Resposta'].map(s =>
-    `<div class="legend-item"><div class="legend-dot" style="background:${STATUS_CONFIG[s].color}"></div>${s}</div>`
-  ).join('');
-
-  if (dates.length === 0) {
-    chartLine = new Chart(ctx, { type: 'line', data: { labels: [], datasets: [] }, options: { responsive: true, maintainAspectRatio: false } });
-    return;
-  }
-
-  chartLine = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: dates.map(d => d.substring(5)),
-      datasets: ['Fechado','Negociação','Aguardando Resposta'].map(s => ({
-        label: s,
-        data: dates.map(d => byDate[d][s] || 0),
-        borderColor: STATUS_CONFIG[s].color,
-        backgroundColor: STATUS_CONFIG[s].color + '22',
-        fill: true, tension: 0.4, pointRadius: 4,
-        borderWidth: 2,
-      }))
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a9bb5', font: { size: 11 } } },
-        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8a9bb5', stepSize: 1 } }
-      }
-    }
-  });
-}
-
-function renderComparativo(entries) {
-  const consultores = [...new Set(entries.map(e => e.consultor))];
-  const body = document.getElementById('ranking-body');
-  if (consultores.length === 0) {
-    body.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">Nenhum dado disponível</div></div>`;
-    return;
-  }
-
-  const data = consultores.map((c, i) => {
-    const ces = entries.filter(e => e.consultor === c);
-    const total = ces.reduce((s, e) => s + e.total, 0);
-    const fechados = ces.reduce((s, e) => s + (e.status['Fechado'] || 0), 0);
-    return { c, total, fechados, taxa: total > 0 ? ((fechados/total)*100).toFixed(1) : 0, i };
-  }).sort((a, b) => b.fechados - a.fechados);
-
-  const maxFechados = Math.max(...data.map(d => d.fechados), 1);
-
-  body.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      ${data.map((d, rank) => `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="rank-avatar ${AVATAR_COLORS[d.i % 8]}" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">
-            ${d.c.split(' ').map(w=>w[0]).join('').substring(0,2)}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-              <span style="font-size:13px;font-weight:500;">${d.c}</span>
-              ${rank === 0 ? '<span class="best-badge">★ TOP</span>' : ''}
-            </div>
-            <div class="progress-wrap"><div class="progress-bar" style="width:${(d.fechados/maxFechados)*100}%;background:${rank===0?'#34d399':'#4f8ef7'}"></div></div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:${rank===0?'var(--green)':'var(--text-primary)'};">${d.fechados}</div>
-            <div style="font-size:10px;color:var(--text-muted);">${d.taxa}% conv.</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function renderStatusBreakdown(totals, grandTotal) {
-  document.getElementById('status-breakdown').innerHTML = STATUSES.map(s => `
-    <div class="status-item">
-      <div class="status-dot" style="background:${STATUS_CONFIG[s].color}"></div>
-      <div class="status-name">${s}</div>
-      <div class="status-count" style="color:${STATUS_CONFIG[s].color}">${totals[s]}</div>
-      <div style="font-size:10px;color:var(--text-muted);margin-left:4px;">${grandTotal > 0 ? ((totals[s]/grandTotal)*100).toFixed(0) : 0}%</div>
-    </div>
-  `).join('');
-}
-
-function renderFullRanking(entries) {
-  const consultores = [...new Set(entries.map(e => e.consultor))];
-  if (consultores.length === 0) {
-    document.getElementById('full-ranking').innerHTML = `<div class="empty-state"><div class="empty-icon">🏆</div><div class="empty-text">Sem dados de ranking</div></div>`;
-    return;
-  }
-
-  const data = consultores.map((c, i) => {
-    const ces = entries.filter(e => e.consultor === c);
-    const total = ces.reduce((s, e) => s + e.total, 0);
-    const fechados = ces.reduce((s, e) => s + (e.status['Fechado'] || 0), 0);
-    const neg = ces.reduce((s, e) => s + (e.status['Negociação'] || 0), 0);
-    const score = fechados * 3 + neg * 1;
-    return { c, total, fechados, neg, score, i };
-  }).sort((a, b) => b.score - a.score);
-
-  const maxScore = Math.max(...data.map(d => d.score), 1);
-  const badges = ['gold','silver','bronze'];
-
-  document.getElementById('full-ranking').innerHTML = `
-    <div class="ranking-list">
-      ${data.map((d, rank) => `
-        <div class="ranking-item ${rank===0?'first':''}">
-          <div class="rank-badge ${badges[rank] || ''}">${rank+1}</div>
-          <div class="rank-avatar ${AVATAR_COLORS[d.i % 8]}" style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;">
-            ${d.c.split(' ').map(w=>w[0]).join('').substring(0,2)}
-          </div>
-          <div class="rank-info">
-            <div class="rank-name">${d.c} ${rank===0?'<span class="best-badge">★ Melhor</span>':''}</div>
-            <div class="rank-details">${d.fechados} fechados · ${d.neg} neg · ${d.total} total</div>
-            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${(d.score/maxScore)*100}%;background:${rank===0?'#fbbf24':rank===1?'#94a3b8':rank===2?'#fb923c':'#4f8ef7'}"></div></div>
-          </div>
-          <div class="rank-score" style="color:${rank===0?'var(--amber)':rank===1?'#94a3b8':rank===2?'var(--coral)':'var(--text-primary)'}">
-            ${d.score}
-            <div style="font-size:10px;color:var(--text-muted);font-weight:400;">pts</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-// ============================================================
-// HISTORY
-// ============================================================
-function renderHistory() {
-  const entries = getEntries().slice().reverse();
-  const c = document.getElementById('history-table-container');
-  if (entries.length === 0) {
-    c.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Nenhum registro ainda</div><div class="empty-sub">Acesse "Entrada de Dados" para começar</div></div>`;
-    return;
-  }
-
-  c.innerHTML = `
-    <table class="history-table">
-      <thead>
-        <tr>
-          <th>Data</th><th>Consultor</th>
-          ${STATUSES.map(s => `<th style="color:${STATUS_CONFIG[s].color}">${s.substring(0,8)}</th>`).join('')}
-          <th>Total</th><th>Obs</th><th></th>
-        </tr>
-      </thead>
-      <tbody>
-        ${entries.map(e => {
-          const d = new Date(e.date);
-          const dateStr = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-          return `
-            <tr>
-              <td style="color:var(--text-secondary);font-size:12px;">${dateStr}</td>
-              <td><strong>${e.consultor}</strong></td>
-              ${STATUSES.map(s => `<td style="text-align:center;color:${STATUS_CONFIG[s].color};font-weight:600;">${e.status[s] || 0}</td>`).join('')}
-              <td style="font-weight:600;">${e.total}</td>
-              <td style="color:var(--text-muted);font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.obs || '—'}</td>
-              <td><button class="btn btn-danger" onclick="deleteEntry(${e.id})" style="padding:4px 10px;font-size:11px;">✕</button></td>
-            </tr>
-          `;
-        }).join('')}
-      </tbody>
-    </table>
-  `;
-}
-
-function deleteEntry(id) {
-  const entries = getEntries().filter(e => e.id !== id);
-  saveEntries(entries);
-  renderHistory();
-  updateDashboard();
-  showToast('Registro removido.', 'success');
-}
-
-function confirmClear() {
-  if (confirm('Tem certeza que deseja apagar TODOS os dados? Essa ação não pode ser desfeita.')) {
-    saveEntries([]);
-    renderHistory();
-    updateDashboard();
-    showToast('Todos os dados foram apagados.', 'success');
-  }
-}
-
-// ============================================================
-// EXPORT
-// ============================================================
-function exportData(type) {
-  const entries = getEntries();
-  if (entries.length === 0) { showToast('Nenhum dado para exportar!', 'error'); return; }
-
-  let content, mime, ext;
-  if (type === 'csv') {
-    const header = ['Data','Consultor',...STATUSES,'Total','Obs'];
-    const rows = entries.map(e => [
-      new Date(e.date).toLocaleString('pt-BR'), e.consultor,
-      ...STATUSES.map(s => e.status[s] || 0), e.total, e.obs || ''
-    ]);
-    content = [header, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-    mime = 'text/csv'; ext = 'csv';
-  } else {
-    content = JSON.stringify(entries, null, 2);
-    mime = 'application/json'; ext = 'json';
-  }
-
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `sales-data-${new Date().toISOString().substring(0,10)}.${ext}`;
-  a.click(); URL.revokeObjectURL(url);
-  showToast(`Exportado como .${ext}!`, 'success');
-}
-
-// ============================================================
-// TOAST
-// ============================================================
-function showToast(msg, type = 'success') {
-  const t = document.getElementById('toast');
-  const icons = { success: '✓', error: '✕' };
-  document.getElementById('toast-icon').textContent = icons[type] || '•';
-  document.getElementById('toast-msg').textContent = msg;
-  t.className = `toast ${type} show`;
-  setTimeout(() => { t.classList.remove('show'); }, 3000);
-}
-</script>
-</body>
-</html>
+export default App;
