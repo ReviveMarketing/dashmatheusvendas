@@ -60,7 +60,44 @@
             { id: 'visita', label: 'Visita Corriqueira', color: '#8b5cf6' },
         ];
 
+        const PROCESS_OPTIONS = [
+            { id: 'seguro_dpvat_ipa', label: 'SEGURO DPVAT (IPA)' },
+            { id: 'seguro_dpvat_mac', label: 'SEGURO DPVAT (MAC/ÓBITO)' },
+            { id: 'seguro_vida_ind', label: 'SEGURO DE VIDA (INDIVIDUAL)' },
+            { id: 'seguro_vida_emp', label: 'SEGURO DE VIDA (EMPRESARIAL)' },
+            { id: 'seguro_vida_obt', label: 'SEGURO DE VIDA (ÓBITO)' },
+            { id: 'seguro_terceiro', label: 'SEGURO TERCEIRO' },
+            { id: 'aux_doenca', label: 'AUX. DOENÇA' },
+            { id: 'aux_acidente', label: 'AUX. ACIDENTE' },
+            { id: 'aux_maternidade', label: 'AUX. MATERNIDADE' },
+            { id: 'bpc_loas', label: 'BPC/LOAS' },
+            { id: 'apos_invalidez', label: 'APOSENTADORIA POR INVALIDEZ' },
+            { id: 'pensao_morte', label: 'PENSÃO POR MORTE' },
+            { id: 'revisoes_dpvat', label: 'REVISÕES JUDICIAIS (DPVAT)' },
+            { id: 'acao_transito', label: 'AÇÃO DE ACIDENTE DE TRÂNSITO' },
+            { id: 'fraudes_pix', label: 'FRAUDES/GOLPES PIX' },
+            { id: 'suspensao_cnh', label: 'SUSPENSÃO DE CNH E RECURSO DE MULTAS' },
+            { id: 'inventario', label: 'INVENTÁRIO' },
+            { id: 'revisoes_vida', label: 'REVISÕES JUDICIAIS (SEGURO DE VIDA)' },
+            { id: 'revisoes_terc', label: 'REVISÕES JUDICIAIS (SEGURO TERCEIRO)' },
+            { id: 'trabalhista', label: 'TRABALHISTA' },
+            { id: 'seguro_vida_app', label: 'SEGURO DE VIDA (APLICATIVO)' },
+            { id: 'resp_civil', label: 'AÇÃO DE RESPONSABILIDADE CIVIL' },
+            { id: 'apos_idade', label: 'APOSENTADORIA POR IDADE' },
+            { id: 'apos_tempo', label: 'APOSENTADORIA POR TEMPO DE SERVIÇO' },
+            { id: 'reintegracao', label: 'REINTEGRAÇÃO DE POSSE' },
+            { id: 'terceiro_judicial', label: 'TERCEIRO JUDICIAL' },
+        ];
+
         const DEFAULT_CONSULTANTS = ["André Silva", "Beatriz Costa", "Carlos Eduardo", "Daniela Martins"];
+
+        const getInitialFormData = () => {
+            const base = {
+                aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0,
+            };
+            PROCESS_OPTIONS.forEach(p => base[p.id] = 0);
+            return base;
+        };
 
         const App = () => {
             const [data, setData] = useState([]);
@@ -68,9 +105,7 @@
             const [newConsultantName, setNewConsultantName] = useState('');
             const [selectedConsultant, setSelectedConsultant] = useState('');
             const [registrationDate, setRegistrationDate] = useState(new Date().toISOString().split('T')[0]);
-            const [formData, setFormData] = useState({
-                aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0,
-            });
+            const [formData, setFormData] = useState(getInitialFormData());
             const [filterConsultant, setFilterConsultant] = useState('Todos');
             const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -126,11 +161,11 @@
                 const newEntry = {
                     id: Date.now(),
                     consultant: selectedConsultant,
-                    date: new Date(registrationDate + "T12:00:00").toISOString(), // Meio-dia para evitar erros de fuso
+                    date: new Date(registrationDate + "T12:00:00").toISOString(),
                     values: { ...formData }
                 };
                 setData([newEntry, ...data]);
-                setFormData({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
+                setFormData(getInitialFormData());
                 setActiveTab('dashboard');
             };
 
@@ -151,7 +186,9 @@
                         map[entry.consultant] = { name: entry.consultant, fechado: 0, total: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
                     }
                     Object.keys(entry.values).forEach(key => {
-                        map[entry.consultant][key] += Number(entry.values[key] || 0);
+                        if (STATUS_OPTIONS.find(s => s.id === key)) {
+                            map[entry.consultant][key] += Number(entry.values[key] || 0);
+                        }
                         map[entry.consultant].total += Number(entry.values[key] || 0);
                     });
                 });
@@ -217,15 +254,17 @@
             }, [data, compareDate1, compareDate2]);
 
             const exportToCSV = () => {
-                const headers = "Consultor,Data,Aguardando,Fechado,Negociacao,Sem Dados,Sem Possibilidade,Visita\n";
-                const rows = data.map(d => 
-                    `${d.consultant},${new Date(d.date).toLocaleDateString()},${d.values.aguardando},${d.values.fechado},${d.values.negociacao},${d.values.sem_dados},${d.values.sem_possibilidade},${d.values.visita}`
-                ).join("\n");
-                const blob = new Blob([headers + rows], { type: 'text/csv' });
+                const csvHeaders = ["Consultor", "Data", ...STATUS_OPTIONS.map(s => s.label), ...PROCESS_OPTIONS.map(p => p.label)].join(",") + "\n";
+                const rows = data.map(d => {
+                    const statusVals = STATUS_OPTIONS.map(s => d.values[s.id] || 0);
+                    const processVals = PROCESS_OPTIONS.map(p => d.values[p.id] || 0);
+                    return [d.consultant, new Date(d.date).toLocaleDateString(), ...statusVals, ...processVals].join(",");
+                }).join("\n");
+                const blob = new Blob([csvHeaders + rows], { type: 'text/csv' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.setAttribute('href', url);
-                a.setAttribute('download', 'relatorio_vendas.csv');
+                a.setAttribute('download', 'relatorio_vendas_completo.csv');
                 a.click();
             };
 
@@ -304,7 +343,7 @@
                             {activeTab === 'dashboard' && (
                                 <>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <Card title="Total de Leads" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
+                                        <Card title="Total Geral" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
                                         <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
                                         <Card title="Taxa de Conversão" icon="trending-up"><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
                                         <Card title="Top Consultor" icon="award"><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
@@ -339,19 +378,6 @@
                                             </div>
                                         </Card>
                                     </div>
-                                    <Card title="Evolução Temporal (Fechados)">
-                                        <div className="h-64">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={timelineData}>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                                                    <XAxis dataKey="date" stroke="#64748b" />
-                                                    <YAxis stroke="#64748b" />
-                                                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
-                                                    <Area type="monotone" dataKey="fechado" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={3} />
-                                                </AreaChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </Card>
                                 </>
                             )}
 
@@ -382,7 +408,7 @@
 
                                     {comparisonResults ? (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <Card title="Diferença de Leads">
+                                            <Card title="Diferença de Leads/Entradas">
                                                 <div className="text-3xl font-bold mb-2">{comparisonResults.p2.totalLeads} <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.totalLeads}</span></div>
                                                 <div className={`flex items-center gap-1 text-sm font-bold ${comparisonResults.diffLeads.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     <Icon name={comparisonResults.diffLeads.diff >= 0 ? "trending-up" : "trending-down"} size={16} />
@@ -406,14 +432,14 @@
                                         </div>
                                     ) : (
                                         <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-20 text-center text-slate-500 italic">
-                                            Selecione as duas datas acima para visualizar o comparativo de desempenho comercial.
+                                            Selecione as duas datas acima para comparar o desempenho.
                                         </div>
                                     )}
                                 </div>
                             )}
 
                             {activeTab === 'input' && (
-                                <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+                                <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
                                     {/* Gerenciamento de Consultores */}
                                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
                                         <h2 className="text-xl font-bold flex items-center gap-3 mb-6">
@@ -427,10 +453,7 @@
                                                 placeholder="Nome do novo consultor..."
                                                 className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                                             />
-                                            <button 
-                                                onClick={handleAddConsultant}
-                                                className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-all"
-                                            >
+                                            <button onClick={handleAddConsultant} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-all">
                                                 <Icon name="user-plus" /> Adicionar
                                             </button>
                                         </div>
@@ -473,42 +496,65 @@
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium text-slate-400 mb-2">Data do Registro</label>
-                                                    <div className="relative">
-                                                        <input 
-                                                            type="date"
-                                                            value={registrationDate}
-                                                            onChange={(e) => setRegistrationDate(e.target.value)}
-                                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                                        />
-                                                    </div>
-                                                    <p className="text-xs text-slate-500 mt-2 italic">* Escolha a data correspondente a estes dados.</p>
+                                                    <input 
+                                                        type="date"
+                                                        value={registrationDate}
+                                                        onChange={(e) => setRegistrationDate(e.target.value)}
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                                    />
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                {STATUS_OPTIONS.map(status => (
-                                                    <div key={status.id} className="space-y-2">
-                                                        <label className="block text-sm font-medium text-slate-300 flex items-center justify-between">
-                                                            {status.label}
-                                                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            value={formData[status.id]}
-                                                            onChange={(e) => setFormData({ ...formData, [status.id]: e.target.value })}
-                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                                        />
-                                                    </div>
-                                                ))}
+                                            {/* Status Grid */}
+                                            <div className="pt-4 border-t border-slate-800">
+                                                <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest mb-6">Status dos Atendimentos</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {STATUS_OPTIONS.map(status => (
+                                                        <div key={status.id} className="space-y-2">
+                                                            <label className="block text-xs font-medium text-slate-300 flex items-center justify-between">
+                                                                {status.label}
+                                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={formData[status.id]}
+                                                                onChange={(e) => setFormData({ ...formData, [status.id]: e.target.value })}
+                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
+
+                                            {/* Processos Grid */}
+                                            <div className="pt-4 border-t border-slate-800">
+                                                <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest mb-6">Contagem de Processos</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {PROCESS_OPTIONS.map(proc => (
+                                                        <div key={proc.id} className="space-y-1">
+                                                            <label className="block text-[10px] font-medium text-slate-400 uppercase">
+                                                                {proc.label}
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={formData[proc.id]}
+                                                                onChange={(e) => setFormData({ ...formData, [proc.id]: e.target.value })}
+                                                                className="w-full bg-slate-900 border border-slate-800 rounded-md py-2 px-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
                                             <div className="pt-6">
                                                 <button
                                                     onClick={handleSave}
                                                     disabled={!selectedConsultant}
                                                     className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
                                                 >
-                                                    <Icon name="save" /> Salvar Relatório
+                                                    <Icon name="save" /> Salvar Relatório Completo
                                                 </button>
                                             </div>
                                         </div>
@@ -524,6 +570,7 @@
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Consultor</th>
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Data</th>
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Fechados</th>
+                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Total Entradas</th>
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide text-right">Ações</th>
                                             </tr>
                                         </thead>
@@ -537,6 +584,9 @@
                                                             {item.values.fechado}
                                                         </span>
                                                     </td>
+                                                    <td className="px-6 py-4 text-slate-400">
+                                                        {Object.values(item.values).reduce((a, b) => a + Number(b || 0), 0)}
+                                                    </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <button onClick={() => deleteRecord(item.id)} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded">
                                                             <Icon name="trash-2" size={18} />
@@ -546,7 +596,7 @@
                                             ))}
                                             {filteredData.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="4" className="px-6 py-12 text-center text-slate-500 italic">Nenhum dado registrado ainda.</td>
+                                                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500 italic">Nenhum dado registrado ainda.</td>
                                                 </tr>
                                             )}
                                         </tbody>
