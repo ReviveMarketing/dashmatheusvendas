@@ -74,6 +74,10 @@
             const [filterConsultant, setFilterConsultant] = useState('Todos');
             const [activeTab, setActiveTab] = useState('dashboard');
 
+            // Estados para Comparativo
+            const [compareDate1, setCompareDate1] = useState("");
+            const [compareDate2, setCompareDate2] = useState("");
+
             useEffect(() => {
                 const savedData = localStorage.getItem('executive_dashboard_data');
                 if (savedData) setData(JSON.parse(savedData));
@@ -182,6 +186,36 @@
                 return { totalFechado, totalLeads, conversion, topConsultant: top?.name || "N/A" };
             }, [filteredData, aggregateByConsultant]);
 
+            // Lógica de Comparação
+            const comparisonResults = useMemo(() => {
+                if (!compareDate1 || !compareDate2) return null;
+
+                const getDayStats = (dateStr) => {
+                    const dayData = data.filter(d => d.date.split('T')[0] === dateStr);
+                    const totalLeads = dayData.reduce((acc, curr) => acc + Object.values(curr.values).reduce((a, b) => a + Number(b || 0), 0), 0);
+                    const totalFechado = dayData.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
+                    const conversion = totalLeads > 0 ? (totalFechado / totalLeads * 100).toFixed(1) : 0;
+                    return { totalLeads, totalFechado, conversion };
+                };
+
+                const stats1 = getDayStats(compareDate1);
+                const stats2 = getDayStats(compareDate2);
+
+                const getDiff = (v1, v2) => {
+                    const diff = Number(v2) - Number(v1);
+                    const percent = v1 > 0 ? (diff / v1 * 100).toFixed(1) : (v2 > 0 ? 100 : 0);
+                    return { diff, percent };
+                };
+
+                return {
+                    p1: stats1,
+                    p2: stats2,
+                    diffLeads: getDiff(stats1.totalLeads, stats2.totalLeads),
+                    diffFechado: getDiff(stats1.totalFechado, stats2.totalFechado),
+                    diffConv: { diff: (stats2.conversion - stats1.conversion).toFixed(1) }
+                };
+            }, [data, compareDate1, compareDate2]);
+
             const exportToCSV = () => {
                 const headers = "Consultor,Data,Aguardando,Fechado,Negociacao,Sem Dados,Sem Possibilidade,Visita\n";
                 const rows = data.map(d => 
@@ -218,6 +252,7 @@
                         <div className="flex-1 px-4 space-y-2">
                             {[
                                 { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-2' },
+                                { id: 'compare', label: 'Comparativo', icon: 'git-compare' },
                                 { id: 'input', label: 'Novo Registro', icon: 'plus' },
                                 { id: 'records', label: 'Histórico', icon: 'calendar' },
                             ].map((item) => (
@@ -249,17 +284,19 @@
                                 <p className="text-slate-400 mt-1">Status de leads e performance comercial.</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <div className="relative group">
-                                    <Icon name="filter" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                                    <select 
-                                        value={filterConsultant}
-                                        onChange={(e) => setFilterConsultant(e.target.value)}
-                                        className="bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-8 py-2.5 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                                    >
-                                        <option value="Todos">Todos os Consultores</option>
-                                        {consultants.map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                </div>
+                                {activeTab !== 'compare' && (
+                                    <div className="relative group">
+                                        <Icon name="filter" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                        <select 
+                                            value={filterConsultant}
+                                            onChange={(e) => setFilterConsultant(e.target.value)}
+                                            className="bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-8 py-2.5 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                                        >
+                                            <option value="Todos">Todos os Consultores</option>
+                                            {consultants.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                         </header>
 
@@ -316,6 +353,63 @@
                                         </div>
                                     </Card>
                                 </>
+                            )}
+
+                            {activeTab === 'compare' && (
+                                <div className="space-y-8 animate-in fade-in duration-500">
+                                    <Card title="Seleção de Períodos para Comparação" icon="git-compare">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium text-slate-400">Data Base (Período 1)</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={compareDate1}
+                                                    onChange={(e) => setCompareDate1(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium text-slate-400">Data de Comparação (Período 2)</label>
+                                                <input 
+                                                    type="date" 
+                                                    value={compareDate2}
+                                                    onChange={(e) => setCompareDate2(e.target.value)}
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </Card>
+
+                                    {comparisonResults ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <Card title="Diferença de Leads">
+                                                <div className="text-3xl font-bold mb-2">{comparisonResults.p2.totalLeads} <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.totalLeads}</span></div>
+                                                <div className={`flex items-center gap-1 text-sm font-bold ${comparisonResults.diffLeads.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                    <Icon name={comparisonResults.diffLeads.diff >= 0 ? "trending-up" : "trending-down"} size={16} />
+                                                    {comparisonResults.diffLeads.diff >= 0 ? "+" : ""}{comparisonResults.diffLeads.percent}%
+                                                </div>
+                                            </Card>
+                                            <Card title="Diferença de Fechados">
+                                                <div className="text-3xl font-bold mb-2">{comparisonResults.p2.totalFechado} <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.totalFechado}</span></div>
+                                                <div className={`flex items-center gap-1 text-sm font-bold ${comparisonResults.diffFechado.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                    <Icon name={comparisonResults.diffFechado.diff >= 0 ? "trending-up" : "trending-down"} size={16} />
+                                                    {comparisonResults.diffFechado.diff >= 0 ? "+" : ""}{comparisonResults.diffFechado.percent}%
+                                                </div>
+                                            </Card>
+                                            <Card title="Variação na Conversão">
+                                                <div className="text-3xl font-bold mb-2">{comparisonResults.p2.conversion}% <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.conversion}%</span></div>
+                                                <div className={`flex items-center gap-1 text-sm font-bold ${Number(comparisonResults.diffConv.diff) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                    <Icon name={Number(comparisonResults.diffConv.diff) >= 0 ? "plus" : "minus"} size={16} />
+                                                    {comparisonResults.diffConv.diff} pontos perc.
+                                                </div>
+                                            </Card>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-20 text-center text-slate-500 italic">
+                                            Selecione as duas datas acima para visualizar o comparativo de desempenho comercial.
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
                             {activeTab === 'input' && (
