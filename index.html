@@ -183,13 +183,17 @@
                 const map = {};
                 data.forEach(entry => {
                     if (!map[entry.consultant]) {
-                        map[entry.consultant] = { name: entry.consultant, fechado: 0, total: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
+                        map[entry.consultant] = { name: entry.consultant, fechado: 0, totalLeads: 0, totalProcessos: 0, totalGeral: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
                     }
                     Object.keys(entry.values).forEach(key => {
+                        const val = Number(entry.values[key] || 0);
                         if (STATUS_OPTIONS.find(s => s.id === key)) {
-                            map[entry.consultant][key] += Number(entry.values[key] || 0);
+                            map[entry.consultant][key] += val;
+                            map[entry.consultant].totalLeads += val;
+                        } else if (PROCESS_OPTIONS.find(p => p.id === key)) {
+                            map[entry.consultant].totalProcessos += val;
                         }
-                        map[entry.consultant].total += Number(entry.values[key] || 0);
+                        map[entry.consultant].totalGeral += val;
                     });
                 });
                 return Object.values(map);
@@ -205,6 +209,16 @@
                 return totals.filter(t => t.value > 0);
             }, [filteredData]);
 
+            const processTotals = useMemo(() => {
+                const totals = PROCESS_OPTIONS.map(p => ({ name: p.label, value: 0, id: p.id }));
+                filteredData.forEach(entry => {
+                    PROCESS_OPTIONS.forEach((opt, idx) => {
+                        totals[idx].value += Number(entry.values[opt.id] || 0);
+                    });
+                });
+                return totals.filter(t => t.value > 0).sort((a, b) => b.value - a.value);
+            }, [filteredData]);
+
             const timelineData = useMemo(() => {
                 return [...filteredData]
                     .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -217,10 +231,19 @@
 
             const stats = useMemo(() => {
                 const totalFechado = filteredData.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
-                const totalLeads = filteredData.reduce((acc, curr) => acc + Object.values(curr.values).reduce((a, b) => a + Number(b || 0), 0), 0);
+                const totalLeads = filteredData.reduce((acc, curr) => {
+                    let leadsInEntry = 0;
+                    STATUS_OPTIONS.forEach(s => leadsInEntry += Number(curr.values[s.id] || 0));
+                    return acc + leadsInEntry;
+                }, 0);
+                const totalProcessos = filteredData.reduce((acc, curr) => {
+                    let procInEntry = 0;
+                    PROCESS_OPTIONS.forEach(p => procInEntry += Number(curr.values[p.id] || 0));
+                    return acc + procInEntry;
+                }, 0);
                 const conversion = totalLeads > 0 ? ((totalFechado / totalLeads) * 100).toFixed(1) : 0;
                 const top = [...aggregateByConsultant].sort((a, b) => b.fechado - a.fechado)[0];
-                return { totalFechado, totalLeads, conversion, topConsultant: top?.name || "N/A" };
+                return { totalFechado, totalLeads, totalProcessos, conversion, topConsultant: top?.name || "N/A" };
             }, [filteredData, aggregateByConsultant]);
 
             // Lógica de Comparação
@@ -229,7 +252,8 @@
 
                 const getDayStats = (dateStr) => {
                     const dayData = data.filter(d => d.date.split('T')[0] === dateStr);
-                    const totalLeads = dayData.reduce((acc, curr) => acc + Object.values(curr.values).reduce((a, b) => a + Number(b || 0), 0), 0);
+                    let totalLeads = 0;
+                    dayData.forEach(curr => STATUS_OPTIONS.forEach(s => totalLeads += Number(curr.values[s.id] || 0)));
                     const totalFechado = dayData.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
                     const conversion = totalLeads > 0 ? (totalFechado / totalLeads * 100).toFixed(1) : 0;
                     return { totalLeads, totalFechado, conversion };
@@ -342,15 +366,16 @@
                         <div className="px-6 md:px-10 pb-10 space-y-8">
                             {activeTab === 'dashboard' && (
                                 <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <Card title="Total Geral" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                                        <Card title="Total Leads" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
+                                        <Card title="Total Processos" icon="file-text"><div className="text-3xl font-bold text-indigo-400">{stats.totalProcessos}</div></Card>
                                         <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
                                         <Card title="Taxa de Conversão" icon="trending-up"><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
                                         <Card title="Top Consultor" icon="award"><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
                                     </div>
 
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        <Card title="Status Geral" className="lg:col-span-1">
+                                        <Card title="Status Geral (Leads)" className="lg:col-span-1">
                                             <div className="h-64">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
@@ -372,12 +397,27 @@
                                                         <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
                                                         <Legend />
                                                         <Bar dataKey="fechado" name="Fechado" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                                        <Bar dataKey="negociacao" name="Em Negociação" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="totalLeads" name="Leads" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="totalProcessos" name="Processos" fill="#818cf8" radius={[4, 4, 0, 0]} />
                                                     </BarChart>
                                                 </ResponsiveContainer>
                                             </div>
                                         </Card>
                                     </div>
+
+                                    <Card title="Distribuição de Processos (Top Tipos)" icon="file-text">
+                                        <div className="h-96">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={processTotals} layout="vertical" margin={{ left: 150 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                                                    <XAxis type="number" stroke="#64748b" />
+                                                    <YAxis type="category" dataKey="name" stroke="#64748b" width={140} fontSize={10} />
+                                                    <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
+                                                    <Bar dataKey="value" name="Quantidade" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </Card>
                                 </>
                             )}
 
@@ -408,7 +448,7 @@
 
                                     {comparisonResults ? (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <Card title="Diferença de Leads/Entradas">
+                                            <Card title="Diferença de Leads">
                                                 <div className="text-3xl font-bold mb-2">{comparisonResults.p2.totalLeads} <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.totalLeads}</span></div>
                                                 <div className={`flex items-center gap-1 text-sm font-bold ${comparisonResults.diffLeads.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     <Icon name={comparisonResults.diffLeads.diff >= 0 ? "trending-up" : "trending-down"} size={16} />
@@ -507,7 +547,7 @@
 
                                             {/* Status Grid */}
                                             <div className="pt-4 border-t border-slate-800">
-                                                <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest mb-6">Status dos Atendimentos</h3>
+                                                <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest mb-6">Status dos Atendimentos (Leads)</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                     {STATUS_OPTIONS.map(status => (
                                                         <div key={status.id} className="space-y-2">
@@ -570,7 +610,7 @@
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Consultor</th>
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Data</th>
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Fechados</th>
-                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Total Entradas</th>
+                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Processos</th>
                                                 <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide text-right">Ações</th>
                                             </tr>
                                         </thead>
@@ -584,8 +624,8 @@
                                                             {item.values.fechado}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 text-slate-400">
-                                                        {Object.values(item.values).reduce((a, b) => a + Number(b || 0), 0)}
+                                                    <td className="px-6 py-4 text-indigo-400 font-medium">
+                                                        {PROCESS_OPTIONS.reduce((acc, p) => acc + Number(item.values[p.id] || 0), 0)}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
                                                         <button onClick={() => deleteRecord(item.id)} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded">
