@@ -23,6 +23,12 @@
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        
+        /* Ajuste para inputs de data no dark mode */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100">
@@ -31,13 +37,11 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
         
-        // Extração segura do Recharts do escopo global
         const { 
             BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
             PieChart, Pie, Cell, AreaChart, Area 
         } = window.Recharts;
 
-        // Componente de Ícone Lucide
         const Icon = ({ name, size = 20, className = "" }) => {
             useEffect(() => {
                 if (window.lucide) {
@@ -63,13 +67,13 @@
             const [consultants, setConsultants] = useState([]);
             const [newConsultantName, setNewConsultantName] = useState('');
             const [selectedConsultant, setSelectedConsultant] = useState('');
+            const [registrationDate, setRegistrationDate] = useState(new Date().toISOString().split('T')[0]);
             const [formData, setFormData] = useState({
                 aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0,
             });
             const [filterConsultant, setFilterConsultant] = useState('Todos');
             const [activeTab, setActiveTab] = useState('dashboard');
 
-            // Persistência
             useEffect(() => {
                 const savedData = localStorage.getItem('executive_dashboard_data');
                 if (savedData) setData(JSON.parse(savedData));
@@ -93,7 +97,6 @@
                 localStorage.setItem('executive_consultants', JSON.stringify(consultants));
             }, [consultants]);
 
-            // Lógica de Consultores
             const handleAddConsultant = () => {
                 const name = newConsultantName.trim();
                 if (!name || consultants.includes(name)) return;
@@ -119,7 +122,7 @@
                 const newEntry = {
                     id: Date.now(),
                     consultant: selectedConsultant,
-                    date: new Date().toISOString(),
+                    date: new Date(registrationDate + "T12:00:00").toISOString(), // Meio-dia para evitar erros de fuso
                     values: { ...formData }
                 };
                 setData([newEntry, ...data]);
@@ -133,7 +136,6 @@
                 }
             };
 
-            // Processamento de Dados para Gráficos
             const filteredData = useMemo(() => {
                 return filterConsultant === 'Todos' ? data : data.filter(d => d.consultant === filterConsultant);
             }, [data, filterConsultant]);
@@ -358,22 +360,37 @@
                                             </h2>
                                         </div>
                                         <div className="p-8 space-y-8">
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-400 mb-2">Consultor Responsável</label>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                    {consultants.map(c => (
-                                                        <button
-                                                            key={c}
-                                                            onClick={() => setSelectedConsultant(c)}
-                                                            className={`py-3 px-4 rounded-xl text-sm font-medium transition-all border ${
-                                                                selectedConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                                                            }`}
-                                                        >
-                                                            {c}
-                                                        </button>
-                                                    ))}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-400 mb-2">Consultor Responsável</label>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {consultants.map(c => (
+                                                            <button
+                                                                key={c}
+                                                                onClick={() => setSelectedConsultant(c)}
+                                                                className={`py-3 px-4 rounded-xl text-sm font-medium transition-all border ${
+                                                                    selectedConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                                                }`}
+                                                            >
+                                                                {c}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-slate-400 mb-2">Data do Registro</label>
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="date"
+                                                            value={registrationDate}
+                                                            onChange={(e) => setRegistrationDate(e.target.value)}
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                                        />
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 mt-2 italic">* Escolha a data correspondente a estes dados.</p>
                                                 </div>
                                             </div>
+
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 {STATUS_OPTIONS.map(status => (
                                                     <div key={status.id} className="space-y-2">
