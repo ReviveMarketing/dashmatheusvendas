@@ -1,378 +1,455 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area 
-} from 'recharts';
-import { 
-  Users, TrendingUp, Target, Award, Download, Plus, Filter, 
-  ChevronRight, Calendar, BarChart2, Trash2, Save, UserPlus, X
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VendasPro - Dashboard Executivo</title>
+    <!-- Tailwind CSS para Estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bibliotecas Base (Ordem Crítica) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <!-- Recharts (Versão estável específica para evitar erros de ForwardRef) -->
+    <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+    <!-- Babel e Ícones -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #020617; }
+        /* Scrollbar customizada para o Dark Mode */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+    <div id="root"></div>
 
-// --- Constantes e Configurações ---
-const STATUS_OPTIONS = [
-  { id: 'aguardando', label: 'Aguardando Resposta', color: '#6366f1' },
-  { id: 'fechado', label: 'Fechado', color: '#10b981' },
-  { id: 'negociacao', label: 'Negociação', color: '#f59e0b' },
-  { id: 'sem_dados', label: 'Sem Dados', color: '#64748b' },
-  { id: 'sem_possibilidade', label: 'Sem Possibilidade', color: '#ef4444' },
-  { id: 'visita', label: 'Visita Corriqueira', color: '#8b5cf6' },
-];
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        
+        // Extração segura do Recharts do escopo global
+        const { 
+            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+            PieChart, Pie, Cell, AreaChart, Area 
+        } = window.Recharts;
 
-const DEFAULT_CONSULTANTS = ["André Silva", "Beatriz Costa", "Carlos Eduardo", "Daniela Martins"];
+        // Componente de Ícone Lucide
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
 
-const App = () => {
-  // --- Estados ---
-  const [data, setData] = useState([]);
-  const [consultants, setConsultants] = useState([]);
-  const [newConsultantName, setNewConsultantName] = useState('');
-  const [selectedConsultant, setSelectedConsultant] = useState('');
-  const [formData, setFormData] = useState({
-    aguardando: 0,
-    fechado: 0,
-    negociacao: 0,
-    sem_dados: 0,
-    sem_possibilidade: 0,
-    visita: 0,
-  });
-  const [filterConsultant, setFilterConsultant] = useState('Todos');
-  const [activeTab, setActiveTab] = useState('dashboard');
+        const STATUS_OPTIONS = [
+            { id: 'aguardando', label: 'Aguardando Resposta', color: '#6366f1' },
+            { id: 'fechado', label: 'Fechado', color: '#10b981' },
+            { id: 'negociacao', label: 'Negociação', color: '#f59e0b' },
+            { id: 'sem_dados', label: 'Sem Dados', color: '#64748b' },
+            { id: 'sem_possibilidade', label: 'Sem Possibilidade', color: '#ef4444' },
+            { id: 'visita', label: 'Visita Corriqueira', color: '#8b5cf6' },
+        ];
 
-  // --- Carregamento e Persistência ---
-  useEffect(() => {
-    const savedData = localStorage.getItem('executive_dashboard_data');
-    if (savedData) setData(JSON.parse(savedData));
-    
-    const savedConsultants = localStorage.getItem('executive_consultants');
-    if (savedConsultants) {
-      const parsed = JSON.parse(savedConsultants);
-      setConsultants(parsed);
-      if (parsed.length > 0) setSelectedConsultant(parsed[0]);
-    } else {
-      setConsultants(DEFAULT_CONSULTANTS);
-      setSelectedConsultant(DEFAULT_CONSULTANTS[0]);
-    }
-  }, []);
+        const DEFAULT_CONSULTANTS = ["André Silva", "Beatriz Costa", "Carlos Eduardo", "Daniela Martins"];
 
-  useEffect(() => {
-    localStorage.setItem('executive_dashboard_data', JSON.stringify(data));
-  }, [data]);
+        const App = () => {
+            const [data, setData] = useState([]);
+            const [consultants, setConsultants] = useState([]);
+            const [newConsultantName, setNewConsultantName] = useState('');
+            const [selectedConsultant, setSelectedConsultant] = useState('');
+            const [formData, setFormData] = useState({
+                aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0,
+            });
+            const [filterConsultant, setFilterConsultant] = useState('Todos');
+            const [activeTab, setActiveTab] = useState('dashboard');
 
-  useEffect(() => {
-    localStorage.setItem('executive_consultants', JSON.stringify(consultants));
-  }, [consultants]);
+            // Persistência
+            useEffect(() => {
+                const savedData = localStorage.getItem('executive_dashboard_data');
+                if (savedData) setData(JSON.parse(savedData));
+                
+                const savedConsultants = localStorage.getItem('executive_consultants');
+                if (savedConsultants) {
+                    const parsed = JSON.parse(savedConsultants);
+                    setConsultants(parsed);
+                    if (parsed.length > 0) setSelectedConsultant(parsed[0]);
+                } else {
+                    setConsultants(DEFAULT_CONSULTANTS);
+                    setSelectedConsultant(DEFAULT_CONSULTANTS[0]);
+                }
+            }, []);
 
-  // --- Lógica de Consultores ---
-  const handleAddConsultant = () => {
-    if (!newConsultantName.trim()) return;
-    if (consultants.includes(newConsultantName.trim())) return;
-    
-    const updated = [...consultants, newConsultantName.trim()];
-    setConsultants(updated);
-    setNewConsultantName('');
-    if (consultants.length === 0) setSelectedConsultant(newConsultantName.trim());
-  };
+            useEffect(() => {
+                localStorage.setItem('executive_dashboard_data', JSON.stringify(data));
+            }, [data]);
 
-  const handleRemoveConsultant = (name) => {
-    const updated = consultants.filter(c => c !== name);
-    setConsultants(updated);
-    if (selectedConsultant === name) {
-      setSelectedConsultant(updated[0] || '');
-    }
-  };
+            useEffect(() => {
+                localStorage.setItem('executive_consultants', JSON.stringify(consultants));
+            }, [consultants]);
 
-  // --- Lógica de Negócio ---
-  const handleSave = () => {
-    if (!selectedConsultant) return;
-    const newEntry = {
-      id: Date.now(),
-      consultant: selectedConsultant,
-      date: new Date().toISOString(),
-      values: { ...formData }
-    };
-    setData([newEntry, ...data]);
-    setFormData({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
-    setActiveTab('dashboard');
-  };
+            // Lógica de Consultores
+            const handleAddConsultant = () => {
+                const name = newConsultantName.trim();
+                if (!name || consultants.includes(name)) return;
+                const updated = [...consultants, name];
+                setConsultants(updated);
+                setNewConsultantName('');
+                if (consultants.length === 0) setSelectedConsultant(name);
+            };
 
-  const deleteRecord = (id) => {
-    setData(data.filter(item => item.id !== id));
-  };
+            const handleRemoveConsultant = (name) => {
+                const updated = consultants.filter(c => c !== name);
+                setConsultants(updated);
+                if (selectedConsultant === name) {
+                    setSelectedConsultant(updated[0] || '');
+                }
+            };
 
-  const filteredData = useMemo(() => {
-    return filterConsultant === 'Todos' ? data : data.filter(d => d.consultant === filterConsultant);
-  }, [data, filterConsultant]);
+            const handleSave = () => {
+                if (!selectedConsultant) {
+                    alert("Selecione um consultor primeiro.");
+                    return;
+                }
+                const newEntry = {
+                    id: Date.now(),
+                    consultant: selectedConsultant,
+                    date: new Date().toISOString(),
+                    values: { ...formData }
+                };
+                setData([newEntry, ...data]);
+                setFormData({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
+                setActiveTab('dashboard');
+            };
 
-  const aggregateByConsultant = useMemo(() => {
-    const map = {};
-    data.forEach(entry => {
-      if (!map[entry.consultant]) {
-        map[entry.consultant] = { name: entry.consultant, fechado: 0, total: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
-      }
-      Object.keys(entry.values).forEach(key => {
-        map[entry.consultant][key] += Number(entry.values[key]);
-        map[entry.consultant].total += Number(entry.values[key]);
-      });
-    });
-    return Object.values(map);
-  }, [data]);
+            const deleteRecord = (id) => {
+                if(confirm("Deseja realmente excluir este registro?")) {
+                    setData(data.filter(item => item.id !== id));
+                }
+            };
 
-  const statusTotals = useMemo(() => {
-    const totals = STATUS_OPTIONS.map(s => ({ name: s.label, value: 0, color: s.color, id: s.id }));
-    filteredData.forEach(entry => {
-      STATUS_OPTIONS.forEach((opt, idx) => {
-        totals[idx].value += Number(entry.values[opt.id]);
-      });
-    });
-    return totals.filter(t => t.value > 0);
-  }, [filteredData]);
+            // Processamento de Dados para Gráficos
+            const filteredData = useMemo(() => {
+                return filterConsultant === 'Todos' ? data : data.filter(d => d.consultant === filterConsultant);
+            }, [data, filterConsultant]);
 
-  const timelineData = useMemo(() => {
-    return [...filteredData]
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map(d => ({
-        date: new Date(d.date).toLocaleDateString('pt-BR'),
-        fechado: d.values.fechado,
-        total: Object.values(d.values).reduce((a, b) => a + Number(b), 0)
-      }));
-  }, [filteredData]);
+            const aggregateByConsultant = useMemo(() => {
+                const map = {};
+                data.forEach(entry => {
+                    if (!map[entry.consultant]) {
+                        map[entry.consultant] = { name: entry.consultant, fechado: 0, total: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
+                    }
+                    Object.keys(entry.values).forEach(key => {
+                        map[entry.consultant][key] += Number(entry.values[key] || 0);
+                        map[entry.consultant].total += Number(entry.values[key] || 0);
+                    });
+                });
+                return Object.values(map);
+            }, [data]);
 
-  const stats = useMemo(() => {
-    const totalFechado = filteredData.reduce((acc, curr) => acc + Number(curr.values.fechado), 0);
-    const totalLeads = filteredData.reduce((acc, curr) => acc + Object.values(curr.values).reduce((a, b) => a + Number(b), 0), 0);
-    const conversion = totalLeads > 0 ? ((totalFechado / totalLeads) * 100).toFixed(1) : 0;
-    const top = [...aggregateByConsultant].sort((a, b) => b.fechado - a.fechado)[0];
-    return { totalFechado, totalLeads, conversion, topConsultant: top?.name || "N/A" };
-  }, [filteredData, aggregateByConsultant]);
+            const statusTotals = useMemo(() => {
+                const totals = STATUS_OPTIONS.map(s => ({ name: s.label, value: 0, color: s.color, id: s.id }));
+                filteredData.forEach(entry => {
+                    STATUS_OPTIONS.forEach((opt, idx) => {
+                        totals[idx].value += Number(entry.values[opt.id] || 0);
+                    });
+                });
+                return totals.filter(t => t.value > 0);
+            }, [filteredData]);
 
-  const exportToCSV = () => {
-    const headers = ["Consultor,Data,Aguardando,Fechado,Negociacao,Sem Dados,Sem Possibilidade,Visita\n"];
-    const rows = data.map(d => 
-      `${d.consultant},${new Date(d.date).toLocaleDateString()},${d.values.aguardando},${d.values.fechado},${d.values.negociacao},${d.values.sem_dados},${d.values.sem_possibilidade},${d.values.visita}`
-    );
-    const blob = new Blob([headers + rows.join("\n")], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'relatorio_vendas.csv');
-    a.click();
-  };
+            const timelineData = useMemo(() => {
+                return [...filteredData]
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                    .map(d => ({
+                        date: new Date(d.date).toLocaleDateString('pt-BR'),
+                        fechado: Number(d.values.fechado || 0),
+                        total: Object.values(d.values).reduce((a, b) => a + Number(b || 0), 0)
+                    }));
+            }, [filteredData]);
 
-  const Card = ({ title, children, icon: Icon, className = "" }) => (
-    <div className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl ${className}`}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-slate-400 font-medium text-sm uppercase tracking-wider">{title}</h3>
-        {Icon && <Icon className="text-indigo-500 w-5 h-5" />}
-      </div>
-      {children}
-    </div>
-  );
+            const stats = useMemo(() => {
+                const totalFechado = filteredData.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
+                const totalLeads = filteredData.reduce((acc, curr) => acc + Object.values(curr.values).reduce((a, b) => a + Number(b || 0), 0), 0);
+                const conversion = totalLeads > 0 ? ((totalFechado / totalLeads) * 100).toFixed(1) : 0;
+                const top = [...aggregateByConsultant].sort((a, b) => b.fechado - a.fechado)[0];
+                return { totalFechado, totalLeads, conversion, topConsultant: top?.name || "N/A" };
+            }, [filteredData, aggregateByConsultant]);
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30">
-      <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50">
-        <div className="p-6 mb-8 flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <TrendingUp className="text-white w-6 h-6" />
-          </div>
-          <span className="hidden md:block font-bold text-xl tracking-tight">Vendas<span className="text-indigo-500">Pro</span></span>
-        </div>
-        <div className="flex-1 px-4 space-y-2">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
-            { id: 'input', label: 'Novo Registro', icon: Plus },
-            { id: 'records', label: 'Histórico', icon: Calendar },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${
-                activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <item.icon size={20} />
-              <span className="hidden md:block font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="p-4 border-t border-slate-800">
-           <button onClick={exportToCSV} className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
-            <Download size={20} />
-            <span className="hidden md:block">Exportar Dados</span>
-          </button>
-        </div>
-      </nav>
+            const exportToCSV = () => {
+                const headers = "Consultor,Data,Aguardando,Fechado,Negociacao,Sem Dados,Sem Possibilidade,Visita\n";
+                const rows = data.map(d => 
+                    `${d.consultant},${new Date(d.date).toLocaleDateString()},${d.values.aguardando},${d.values.fechado},${d.values.negociacao},${d.values.sem_dados},${d.values.sem_possibilidade},${d.values.visita}`
+                ).join("\n");
+                const blob = new Blob([headers + rows], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('href', url);
+                a.setAttribute('download', 'relatorio_vendas.csv');
+                a.click();
+            };
 
-      <main className="pl-20 md:pl-64 transition-all duration-300">
-        <header className="p-6 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Relatório Executivo</h1>
-            <p className="text-slate-400 mt-1">Visão geral do desempenho comercial e status de leads.</p>
-          </div>
-          <div className="flex items-center gap-3">
-             <div className="relative group">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-              <select 
-                value={filterConsultant}
-                onChange={(e) => setFilterConsultant(e.target.value)}
-                className="bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-8 py-2.5 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-              >
-                <option value="Todos">Todos os Consultores</option>
-                {consultants.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-        </header>
-
-        <div className="px-6 md:px-10 pb-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {activeTab === 'dashboard' && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card title="Total de Leads" icon={Users}><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
-                <Card title="Fechamentos" icon={Target}><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
-                <Card title="Taxa de Conversão" icon={TrendingUp}><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
-                <Card title="Top Consultor" icon={Award}><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card title="Status Geral" className="lg:col-span-1">
-                  <div className="h-64">
-                    <ResponsiveContainer><PieChart><Pie data={statusTotals} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{statusTotals.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/></PieChart></ResponsiveContainer>
-                  </div>
-                </Card>
-                <Card title="Comparativo por Consultor" className="lg:col-span-2">
-                  <div className="h-72">
-                    <ResponsiveContainer><BarChart data={aggregateByConsultant}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} /><XAxis dataKey="name" stroke="#64748b" /><YAxis stroke="#64748b" /><Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/><Legend /><Bar dataKey="fechado" name="Fechado" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="negociacao" name="Em Negociação" fill="#f59e0b" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
-                  </div>
-                </Card>
-              </div>
-              <Card title="Evolução Temporal">
-                <div className="h-64">
-                  <ResponsiveContainer><AreaChart data={timelineData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="date" stroke="#64748b" /><YAxis stroke="#64748b" /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/><Area type="monotone" dataKey="fechado" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={3} /></AreaChart></ResponsiveContainer>
-                </div>
-              </Card>
-            </>
-          )}
-
-          {activeTab === 'input' && (
-            <div className="max-w-4xl mx-auto space-y-8">
-              {/* Gerenciamento de Consultores */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-                <h2 className="text-xl font-bold flex items-center gap-3 mb-6">
-                  <Users className="text-indigo-500" /> Gerenciar Consultores
-                </h2>
-                <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <input 
-                    type="text"
-                    value={newConsultantName}
-                    onChange={(e) => setNewConsultantName(e.target.value)}
-                    placeholder="Nome do novo consultor..."
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                  <button 
-                    onClick={handleAddConsultant}
-                    className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-all"
-                  >
-                    <UserPlus size={20} /> Adicionar
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {consultants.map(c => (
-                    <div key={c} className="flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full group">
-                      <span className="text-sm font-medium">{c}</span>
-                      <button onClick={() => handleRemoveConsultant(c)} className="text-slate-500 hover:text-red-400 transition-colors">
-                        <X size={14} />
-                      </button>
+            const Card = ({ title, children, icon, className = "" }) => (
+                <div className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl ${className}`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-slate-400 font-medium text-sm uppercase tracking-wider">{title}</h3>
+                        {icon && <Icon name={icon} className="text-indigo-500" />}
                     </div>
-                  ))}
-                  {consultants.length === 0 && <p className="text-slate-500 italic text-sm">Nenhum consultor cadastrado.</p>}
+                    {children}
                 </div>
-              </div>
+            );
 
-              {/* Registro de Dados */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-                <div className="bg-indigo-600/10 p-8 border-b border-slate-800">
-                  <h2 className="text-2xl font-bold flex items-center gap-3">
-                    <Plus className="text-indigo-500" /> Inserir Novo Registro
-                  </h2>
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+                    {/* Navigation Sidebar */}
+                    <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50">
+                        <div className="p-6 mb-8 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                <Icon name="trending-up" className="text-white" />
+                            </div>
+                            <span className="hidden md:block font-bold text-xl tracking-tight">Vendas<span className="text-indigo-500">Pro</span></span>
+                        </div>
+                        <div className="flex-1 px-4 space-y-2">
+                            {[
+                                { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-2' },
+                                { id: 'input', label: 'Novo Registro', icon: 'plus' },
+                                { id: 'records', label: 'Histórico', icon: 'calendar' },
+                            ].map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setActiveTab(item.id)}
+                                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${
+                                        activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <Icon name={item.icon} />
+                                    <span className="hidden md:block font-medium">{item.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="p-4 border-t border-slate-800">
+                            <button onClick={exportToCSV} className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
+                                <Icon name="download" />
+                                <span className="hidden md:block">Exportar Dados</span>
+                            </button>
+                        </div>
+                    </nav>
+
+                    {/* Main Content Area */}
+                    <main className="pl-20 md:pl-64 transition-all duration-300">
+                        <header className="p-6 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold text-white">Relatório Executivo</h1>
+                                <p className="text-slate-400 mt-1">Status de leads e performance comercial.</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="relative group">
+                                    <Icon name="filter" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                                    <select 
+                                        value={filterConsultant}
+                                        onChange={(e) => setFilterConsultant(e.target.value)}
+                                        className="bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-8 py-2.5 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                                    >
+                                        <option value="Todos">Todos os Consultores</option>
+                                        {consultants.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="px-6 md:px-10 pb-10 space-y-8">
+                            {activeTab === 'dashboard' && (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <Card title="Total de Leads" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
+                                        <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
+                                        <Card title="Taxa de Conversão" icon="trending-up"><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
+                                        <Card title="Top Consultor" icon="award"><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        <Card title="Status Geral" className="lg:col-span-1">
+                                            <div className="h-64">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie data={statusTotals} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                            {statusTotals.map((e, i) => <Cell key={i} fill={e.color} />)}
+                                                        </Pie>
+                                                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}/>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </Card>
+                                        <Card title="Comparativo de Consultores" className="lg:col-span-2">
+                                            <div className="h-72">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={aggregateByConsultant}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                        <XAxis dataKey="name" stroke="#64748b" />
+                                                        <YAxis stroke="#64748b" />
+                                                        <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
+                                                        <Legend />
+                                                        <Bar dataKey="fechado" name="Fechado" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="negociacao" name="Em Negociação" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                    <Card title="Evolução Temporal (Fechados)">
+                                        <div className="h-64">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={timelineData}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                                                    <XAxis dataKey="date" stroke="#64748b" />
+                                                    <YAxis stroke="#64748b" />
+                                                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
+                                                    <Area type="monotone" dataKey="fechado" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={3} />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </Card>
+                                </>
+                            )}
+
+                            {activeTab === 'input' && (
+                                <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+                                    {/* Gerenciamento de Consultores */}
+                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+                                        <h2 className="text-xl font-bold flex items-center gap-3 mb-6">
+                                            <Icon name="users" className="text-indigo-500" /> Gerenciar Consultores
+                                        </h2>
+                                        <div className="flex flex-col md:flex-row gap-4 mb-6">
+                                            <input 
+                                                type="text"
+                                                value={newConsultantName}
+                                                onChange={(e) => setNewConsultantName(e.target.value)}
+                                                placeholder="Nome do novo consultor..."
+                                                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                            />
+                                            <button 
+                                                onClick={handleAddConsultant}
+                                                className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-all"
+                                            >
+                                                <Icon name="user-plus" /> Adicionar
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {consultants.map(c => (
+                                                <div key={c} className="flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full group">
+                                                    <span className="text-sm font-medium">{c}</span>
+                                                    <button onClick={() => handleRemoveConsultant(c)} className="text-slate-500 hover:text-red-400 transition-colors">
+                                                        <Icon name="x" size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Registro de Dados */}
+                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                                        <div className="bg-indigo-600/10 p-8 border-b border-slate-800">
+                                            <h2 className="text-2xl font-bold flex items-center gap-3">
+                                                <Icon name="plus" className="text-indigo-500" /> Inserir Novo Registro
+                                            </h2>
+                                        </div>
+                                        <div className="p-8 space-y-8">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-400 mb-2">Consultor Responsável</label>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                    {consultants.map(c => (
+                                                        <button
+                                                            key={c}
+                                                            onClick={() => setSelectedConsultant(c)}
+                                                            className={`py-3 px-4 rounded-xl text-sm font-medium transition-all border ${
+                                                                selectedConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                                            }`}
+                                                        >
+                                                            {c}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                {STATUS_OPTIONS.map(status => (
+                                                    <div key={status.id} className="space-y-2">
+                                                        <label className="block text-sm font-medium text-slate-300 flex items-center justify-between">
+                                                            {status.label}
+                                                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={formData[status.id]}
+                                                            onChange={(e) => setFormData({ ...formData, [status.id]: e.target.value })}
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="pt-6">
+                                                <button
+                                                    onClick={handleSave}
+                                                    disabled={!selectedConsultant}
+                                                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
+                                                >
+                                                    <Icon name="save" /> Salvar Relatório
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'records' && (
+                                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-widest">
+                                            <tr>
+                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Consultor</th>
+                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Data</th>
+                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Fechados</th>
+                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide text-right">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800">
+                                            {filteredData.map((item) => (
+                                                <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
+                                                    <td className="px-6 py-4 font-medium">{item.consultant}</td>
+                                                    <td className="px-6 py-4 text-slate-400">{new Date(item.date).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded text-xs font-bold">
+                                                            {item.values.fechado}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => deleteRecord(item.id)} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded">
+                                                            <Icon name="trash-2" size={18} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {filteredData.length === 0 && (
+                                                <tr>
+                                                    <td colSpan="4" className="px-6 py-12 text-center text-slate-500 italic">Nenhum dado registrado ainda.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </main>
                 </div>
-                <div className="p-8 space-y-8">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">Consultor Responsável</label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {consultants.map(c => (
-                        <button
-                          key={c}
-                          onClick={() => setSelectedConsultant(c)}
-                          className={`py-3 px-4 rounded-xl text-sm font-medium transition-all border ${
-                            selectedConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {STATUS_OPTIONS.map(status => (
-                      <div key={status.id} className="space-y-2">
-                        <label className="block text-sm font-medium text-slate-300 flex items-center justify-between">
-                          {status.label}
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={formData[status.id]}
-                          onChange={(e) => setFormData({ ...formData, [status.id]: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="pt-6">
-                    <button
-                      onClick={handleSave}
-                      disabled={!selectedConsultant}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
-                    >
-                      <Save size={20} /> Salvar Relatório
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+        };
 
-          {activeTab === 'records' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-widest">
-                  <tr>
-                    <th className="px-6 py-4">Consultor</th>
-                    <th className="px-6 py-4">Data</th>
-                    <th className="px-6 py-4">Fechados</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {filteredData.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
-                      <td className="px-6 py-4 font-medium">{item.consultant}</td>
-                      <td className="px-6 py-4 text-slate-400">{new Date(item.date).toLocaleDateString('pt-BR')}</td>
-                      <td className="px-6 py-4"><span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded text-xs font-bold">{item.values.fechado}</span></td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => deleteRecord(item.id)} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default App;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
