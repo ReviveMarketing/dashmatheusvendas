@@ -18,16 +18,17 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #020617; }
-        /* Scrollbar customizada para o Dark Mode */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         
-        /* Ajuste para inputs de data no dark mode */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-            cursor: pointer;
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
         }
     </style>
 </head>
@@ -43,11 +44,7 @@
         } = window.Recharts;
 
         const Icon = ({ name, size = 20, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }, [name]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
@@ -89,208 +86,148 @@
             { id: 'terceiro_judicial', label: 'TERCEIRO JUDICIAL' },
         ];
 
-        const DEFAULT_CONSULTANTS = ["André Silva", "Beatriz Costa", "Carlos Eduardo", "Daniela Martins"];
-
-        const getInitialFormData = () => {
-            const base = {
-                aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0,
-            };
-            PROCESS_OPTIONS.forEach(p => base[p.id] = 0);
-            return base;
-        };
-
         const App = () => {
             const [data, setData] = useState([]);
             const [consultants, setConsultants] = useState([]);
+            const [bscData, setBscData] = useState({});
             const [newConsultantName, setNewConsultantName] = useState('');
-            const [selectedConsultant, setSelectedConsultant] = useState('');
-            const [registrationDate, setRegistrationDate] = useState(new Date().toISOString().split('T')[0]);
-            const [formData, setFormData] = useState(getInitialFormData());
-            const [filterConsultant, setFilterConsultant] = useState('Todos');
             const [activeTab, setActiveTab] = useState('dashboard');
-
-            // Estados para Comparativo
-            const [compareDate1, setCompareDate1] = useState("");
-            const [compareDate2, setCompareDate2] = useState("");
+            const [registrationDate, setRegistrationDate] = useState(new Date().toISOString().split('T')[0]);
+            const [formData, setFormData] = useState({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
+            
+            const [monthCompare1, setMonthCompare1] = useState("");
+            const [monthCompare2, setMonthCompare2] = useState("");
+            const [consCompare1, setConsCompare1] = useState("");
+            const [consCompare2, setConsCompare2] = useState("");
+            
+            const [currentBscMonth, setCurrentBscMonth] = useState(new Date().toISOString().substring(0, 7));
 
             useEffect(() => {
                 const savedData = localStorage.getItem('executive_dashboard_data');
                 if (savedData) setData(JSON.parse(savedData));
-                
                 const savedConsultants = localStorage.getItem('executive_consultants');
-                if (savedConsultants) {
-                    const parsed = JSON.parse(savedConsultants);
-                    setConsultants(parsed);
-                    if (parsed.length > 0) setSelectedConsultant(parsed[0]);
-                } else {
-                    setConsultants(DEFAULT_CONSULTANTS);
-                    setSelectedConsultant(DEFAULT_CONSULTANTS[0]);
-                }
+                if (savedConsultants) setConsultants(JSON.parse(savedConsultants));
+                const savedBsc = localStorage.getItem('executive_bsc_data');
+                if (savedBsc) setBscData(JSON.parse(savedBsc));
             }, []);
 
-            useEffect(() => {
-                localStorage.setItem('executive_dashboard_data', JSON.stringify(data));
-            }, [data]);
-
-            useEffect(() => {
-                localStorage.setItem('executive_consultants', JSON.stringify(consultants));
-            }, [consultants]);
-
-            const handleAddConsultant = () => {
-                const name = newConsultantName.trim();
-                if (!name || consultants.includes(name)) return;
-                const updated = [...consultants, name];
-                setConsultants(updated);
-                setNewConsultantName('');
-                if (consultants.length === 0) setSelectedConsultant(name);
-            };
-
-            const handleRemoveConsultant = (name) => {
-                const updated = consultants.filter(c => c !== name);
-                setConsultants(updated);
-                if (selectedConsultant === name) {
-                    setSelectedConsultant(updated[0] || '');
-                }
-            };
+            useEffect(() => { localStorage.setItem('executive_dashboard_data', JSON.stringify(data)); }, [data]);
+            useEffect(() => { localStorage.setItem('executive_consultants', JSON.stringify(consultants)); }, [consultants]);
+            useEffect(() => { localStorage.setItem('executive_bsc_data', JSON.stringify(bscData)); }, [bscData]);
 
             const handleSave = () => {
-                if (!selectedConsultant) {
-                    alert("Selecione um consultor primeiro.");
-                    return;
-                }
                 const newEntry = {
                     id: Date.now(),
-                    consultant: selectedConsultant,
+                    consultant: "Geral",
                     date: new Date(registrationDate + "T12:00:00").toISOString(),
                     values: { ...formData }
                 };
                 setData([newEntry, ...data]);
-                setFormData(getInitialFormData());
+                setFormData({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
                 setActiveTab('dashboard');
             };
 
-            const deleteRecord = (id) => {
-                if(confirm("Deseja realmente excluir este registro?")) {
-                    setData(data.filter(item => item.id !== id));
-                }
+            const addConsultant = () => {
+                if (!newConsultantName.trim()) return;
+                const newC = {
+                    name: newConsultantName.trim(),
+                    weeklyClosed: 0,
+                    monthlyClosed: 0
+                };
+                setConsultants([...consultants, newC]);
+                setNewConsultantName('');
             };
 
-            const filteredData = useMemo(() => {
-                return filterConsultant === 'Todos' ? data : data.filter(d => d.consultant === filterConsultant);
-            }, [data, filterConsultant]);
+            const updateConsultantValues = (name, field, value) => {
+                setConsultants(consultants.map(c => c.name === name ? { ...c, [field]: Number(value) } : c));
+            };
 
-            const aggregateByConsultant = useMemo(() => {
-                const map = {};
-                data.forEach(entry => {
-                    if (!map[entry.consultant]) {
-                        map[entry.consultant] = { name: entry.consultant, fechado: 0, totalLeads: 0, totalProcessos: 0, totalGeral: 0, aguardando: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 };
+            const updateBscValue = (field, value) => {
+                setBscData(prev => ({
+                    ...prev,
+                    [currentBscMonth]: {
+                        ...prev[currentBscMonth],
+                        [field]: Number(value) || 0
                     }
-                    Object.keys(entry.values).forEach(key => {
-                        const val = Number(entry.values[key] || 0);
-                        if (STATUS_OPTIONS.find(s => s.id === key)) {
-                            map[entry.consultant][key] += val;
-                            map[entry.consultant].totalLeads += val;
-                        } else if (PROCESS_OPTIONS.find(p => p.id === key)) {
-                            map[entry.consultant].totalProcessos += val;
-                        }
-                        map[entry.consultant].totalGeral += val;
-                    });
-                });
-                return Object.values(map);
-            }, [data]);
+                }));
+            };
+
+            const bscValues = useMemo(() => {
+                const values = bscData[currentBscMonth] || {};
+                const investment = values.investment || 0;
+                const leadsTraffic = values.leadsTraffic || 0;
+                const leadsOrganic = values.leadsOrganic || 0;
+                const totalLeads = leadsTraffic + leadsOrganic;
+                
+                const closedTraffic = values.closedTraffic || 0;
+                const closedOrganic = values.closedOrganic || 0;
+                const totalClosed = closedTraffic + closedOrganic;
+
+                const cpl = leadsTraffic > 0 ? (investment / leadsTraffic) : 0;
+                const cac = closedTraffic > 0 ? (investment / closedTraffic) : 0;
+
+                return { 
+                    ...values, investment, leadsTraffic, leadsOrganic, totalLeads, 
+                    closedTraffic, closedOrganic, totalClosed, cpl, cac 
+                };
+            }, [bscData, currentBscMonth]);
+
+            const stats = useMemo(() => {
+                const totalFechado = data.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
+                const totalLeads = data.reduce((acc, curr) => {
+                    let sum = 0;
+                    STATUS_OPTIONS.forEach(s => sum += Number(curr.values[s.id] || 0));
+                    return acc + sum;
+                }, 0);
+                const totalProcessos = data.reduce((acc, curr) => {
+                    let sum = 0;
+                    PROCESS_OPTIONS.forEach(p => sum += Number(curr.values[p.id] || 0));
+                    return acc + sum;
+                }, 0);
+                const conversion = totalLeads > 0 ? ((totalFechado / totalLeads) * 100).toFixed(1) : 0;
+                const top = [...consultants].sort((a, b) => b.monthlyClosed - a.monthlyClosed)[0];
+                return { totalFechado, totalLeads, totalProcessos, conversion, topConsultant: top?.name || "N/A" };
+            }, [data, consultants]);
 
             const statusTotals = useMemo(() => {
                 const totals = STATUS_OPTIONS.map(s => ({ name: s.label, value: 0, color: s.color, id: s.id }));
-                filteredData.forEach(entry => {
+                data.forEach(entry => {
                     STATUS_OPTIONS.forEach((opt, idx) => {
                         totals[idx].value += Number(entry.values[opt.id] || 0);
                     });
                 });
                 return totals.filter(t => t.value > 0);
-            }, [filteredData]);
+            }, [data]);
 
             const processTotals = useMemo(() => {
                 const totals = PROCESS_OPTIONS.map(p => ({ name: p.label, value: 0, id: p.id }));
-                filteredData.forEach(entry => {
+                data.forEach(entry => {
                     PROCESS_OPTIONS.forEach((opt, idx) => {
                         totals[idx].value += Number(entry.values[opt.id] || 0);
                     });
                 });
                 return totals.filter(t => t.value > 0).sort((a, b) => b.value - a.value);
-            }, [filteredData]);
+            }, [data]);
 
-            const timelineData = useMemo(() => {
-                return [...filteredData]
-                    .sort((a, b) => new Date(a.date) - new Date(b.date))
-                    .map(d => ({
-                        date: new Date(d.date).toLocaleDateString('pt-BR'),
-                        fechado: Number(d.values.fechado || 0),
-                        total: Object.values(d.values).reduce((a, b) => a + Number(b || 0), 0)
-                    }));
-            }, [filteredData]);
+            const monthlyAggregation = useMemo(() => {
+                const months = {};
+                data.forEach(d => {
+                    const monthKey = d.date.substring(0, 7);
+                    if (!months[monthKey]) months[monthKey] = { label: monthKey, fechado: 0, processos: 0 };
+                    months[monthKey].fechado += Number(d.values.fechado || 0);
+                    PROCESS_OPTIONS.forEach(p => months[monthKey].processos += Number(d.values[p.id] || 0));
+                });
+                return months;
+            }, [data]);
 
-            const stats = useMemo(() => {
-                const totalFechado = filteredData.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
-                const totalLeads = filteredData.reduce((acc, curr) => {
-                    let leadsInEntry = 0;
-                    STATUS_OPTIONS.forEach(s => leadsInEntry += Number(curr.values[s.id] || 0));
-                    return acc + leadsInEntry;
-                }, 0);
-                const totalProcessos = filteredData.reduce((acc, curr) => {
-                    let procInEntry = 0;
-                    PROCESS_OPTIONS.forEach(p => procInEntry += Number(curr.values[p.id] || 0));
-                    return acc + procInEntry;
-                }, 0);
-                const conversion = totalLeads > 0 ? ((totalFechado / totalLeads) * 100).toFixed(1) : 0;
-                const top = [...aggregateByConsultant].sort((a, b) => b.fechado - a.fechado)[0];
-                return { totalFechado, totalLeads, totalProcessos, conversion, topConsultant: top?.name || "N/A" };
-            }, [filteredData, aggregateByConsultant]);
-
-            // Lógica de Comparação
-            const comparisonResults = useMemo(() => {
-                if (!compareDate1 || !compareDate2) return null;
-
-                const getDayStats = (dateStr) => {
-                    const dayData = data.filter(d => d.date.split('T')[0] === dateStr);
-                    let totalLeads = 0;
-                    dayData.forEach(curr => STATUS_OPTIONS.forEach(s => totalLeads += Number(curr.values[s.id] || 0)));
-                    const totalFechado = dayData.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
-                    const conversion = totalLeads > 0 ? (totalFechado / totalLeads * 100).toFixed(1) : 0;
-                    return { totalLeads, totalFechado, conversion };
-                };
-
-                const stats1 = getDayStats(compareDate1);
-                const stats2 = getDayStats(compareDate2);
-
-                const getDiff = (v1, v2) => {
-                    const diff = Number(v2) - Number(v1);
-                    const percent = v1 > 0 ? (diff / v1 * 100).toFixed(1) : (v2 > 0 ? 100 : 0);
-                    return { diff, percent };
-                };
-
-                return {
-                    p1: stats1,
-                    p2: stats2,
-                    diffLeads: getDiff(stats1.totalLeads, stats2.totalLeads),
-                    diffFechado: getDiff(stats1.totalFechado, stats2.totalFechado),
-                    diffConv: { diff: (stats2.conversion - stats1.conversion).toFixed(1) }
-                };
-            }, [data, compareDate1, compareDate2]);
-
-            const exportToCSV = () => {
-                const csvHeaders = ["Consultor", "Data", ...STATUS_OPTIONS.map(s => s.label), ...PROCESS_OPTIONS.map(p => p.label)].join(",") + "\n";
-                const rows = data.map(d => {
-                    const statusVals = STATUS_OPTIONS.map(s => d.values[s.id] || 0);
-                    const processVals = PROCESS_OPTIONS.map(p => d.values[p.id] || 0);
-                    return [d.consultant, new Date(d.date).toLocaleDateString(), ...statusVals, ...processVals].join(",");
-                }).join("\n");
-                const blob = new Blob([csvHeaders + rows], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.setAttribute('href', url);
-                a.setAttribute('download', 'relatorio_vendas_completo.csv');
-                a.click();
-            };
+            const monthDiffResults = useMemo(() => {
+                if (!monthCompare1 || !monthCompare2) return null;
+                const m1 = monthlyAggregation[monthCompare1] || { fechado: 0 };
+                const m2 = monthlyAggregation[monthCompare2] || { fechado: 0 };
+                const diff = m2.fechado - m1.fechado;
+                const percent = m1.fechado > 0 ? ((diff / m1.fechado) * 100).toFixed(1) : (m2.fechado > 0 ? 100 : 0);
+                return { m1, m2, diff, percent };
+            }, [monthlyAggregation, monthCompare1, monthCompare2]);
 
             const Card = ({ title, children, icon, className = "" }) => (
                 <div className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl ${className}`}>
@@ -304,10 +241,9 @@
 
             return (
                 <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-                    {/* Navigation Sidebar */}
                     <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50">
                         <div className="p-6 mb-8 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
                                 <Icon name="trending-up" className="text-white" />
                             </div>
                             <span className="hidden md:block font-bold text-xl tracking-tight">Vendas<span className="text-indigo-500">Pro</span></span>
@@ -315,52 +251,23 @@
                         <div className="flex-1 px-4 space-y-2">
                             {[
                                 { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-2' },
+                                { id: 'consultants', label: 'Consultores', icon: 'users' },
                                 { id: 'compare', label: 'Comparativo', icon: 'git-compare' },
+                                { id: 'bsc', label: 'BSC Marketing', icon: 'pie-chart' },
                                 { id: 'input', label: 'Novo Registro', icon: 'plus' },
-                                { id: 'records', label: 'Histórico', icon: 'calendar' },
                             ].map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setActiveTab(item.id)}
-                                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${
-                                        activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
-                                    }`}
-                                >
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
                                     <Icon name={item.icon} />
                                     <span className="hidden md:block font-medium">{item.label}</span>
                                 </button>
                             ))}
                         </div>
-                        <div className="p-4 border-t border-slate-800">
-                            <button onClick={exportToCSV} className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
-                                <Icon name="download" />
-                                <span className="hidden md:block">Exportar Dados</span>
-                            </button>
-                        </div>
                     </nav>
 
-                    {/* Main Content Area */}
                     <main className="pl-20 md:pl-64 transition-all duration-300">
-                        <header className="p-6 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h1 className="text-3xl font-bold text-white">Relatório Executivo</h1>
-                                <p className="text-slate-400 mt-1">Status de leads e performance comercial.</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                {activeTab !== 'compare' && (
-                                    <div className="relative group">
-                                        <Icon name="filter" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                                        <select 
-                                            value={filterConsultant}
-                                            onChange={(e) => setFilterConsultant(e.target.value)}
-                                            className="bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-8 py-2.5 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                                        >
-                                            <option value="Todos">Todos os Consultores</option>
-                                            {consultants.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
+                        <header className="p-6 md:p-10">
+                            <h1 className="text-3xl font-bold text-white">Relatório Executivo</h1>
+                            <p className="text-slate-400 mt-1">Gestão de performance e processos.</p>
                         </header>
 
                         <div className="px-6 md:px-10 pb-10 space-y-8">
@@ -370,7 +277,7 @@
                                         <Card title="Total Leads" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
                                         <Card title="Total Processos" icon="file-text"><div className="text-3xl font-bold text-indigo-400">{stats.totalProcessos}</div></Card>
                                         <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
-                                        <Card title="Taxa de Conversão" icon="trending-up"><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
+                                        <Card title="Taxa Conversão" icon="trending-up"><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
                                         <Card title="Top Consultor" icon="award"><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
                                     </div>
 
@@ -387,25 +294,24 @@
                                                 </ResponsiveContainer>
                                             </div>
                                         </Card>
-                                        <Card title="Comparativo de Consultores" className="lg:col-span-2">
+                                        <Card title="Desempenho Semanal/Mensal" className="lg:col-span-2">
                                             <div className="h-72">
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={aggregateByConsultant}>
+                                                    <BarChart data={consultants}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                                                         <XAxis dataKey="name" stroke="#64748b" />
                                                         <YAxis stroke="#64748b" />
                                                         <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
                                                         <Legend />
-                                                        <Bar dataKey="fechado" name="Fechado" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                                        <Bar dataKey="totalLeads" name="Leads" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                                                        <Bar dataKey="totalProcessos" name="Processos" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="weeklyClosed" name="Semana" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                                        <Bar dataKey="monthlyClosed" name="Mês" fill="#10b981" radius={[4, 4, 0, 0]} />
                                                     </BarChart>
                                                 </ResponsiveContainer>
                                             </div>
                                         </Card>
                                     </div>
 
-                                    <Card title="Distribuição de Processos (Top Tipos)" icon="file-text">
+                                    <Card title="Distribuição de Processos Geral" icon="file-text">
                                         <div className="h-96">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={processTotals} layout="vertical" margin={{ left: 150 }}>
@@ -421,226 +327,248 @@
                                 </>
                             )}
 
-                            {activeTab === 'compare' && (
+                            {activeTab === 'bsc' && (
                                 <div className="space-y-8 animate-in fade-in duration-500">
-                                    <Card title="Seleção de Períodos para Comparação" icon="git-compare">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-400">Data Base (Período 1)</label>
-                                                <input 
-                                                    type="date" 
-                                                    value={compareDate1}
-                                                    onChange={(e) => setCompareDate1(e.target.value)}
-                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                />
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4 bg-slate-900 border border-slate-800 p-2 rounded-xl">
+                                            <button 
+                                                onClick={() => {
+                                                    const d = new Date(currentBscMonth + "-01");
+                                                    d.setMonth(d.getMonth() - 1);
+                                                    setCurrentBscMonth(d.toISOString().substring(0, 7));
+                                                }}
+                                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"
+                                            >
+                                                <Icon name="chevron-left" />
+                                            </button>
+                                            <span className="font-bold text-indigo-400 min-w-[120px] text-center uppercase">
+                                                {new Date(currentBscMonth + "-02").toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                                            </span>
+                                            <button 
+                                                onClick={() => {
+                                                    const d = new Date(currentBscMonth + "-01");
+                                                    d.setMonth(d.getMonth() + 1);
+                                                    setCurrentBscMonth(d.toISOString().substring(0, 7));
+                                                }}
+                                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"
+                                            >
+                                                <Icon name="chevron-right" />
+                                            </button>
+                                        </div>
+                                        <div className="text-slate-400 text-sm">Dados salvos automaticamente por mês.</div>
+                                    </div>
+
+                                    {/* Principais KPIs do BSC */}
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        <Card title="Investimento" icon="dollar-sign">
+                                            <div className="text-2xl font-bold">R$ {bscValues.investment.toLocaleString('pt-BR')}</div>
+                                        </Card>
+                                        <Card title="CPL (Custo por Lead)" icon="target">
+                                            <div className="text-2xl font-bold text-indigo-400">R$ {bscValues.cpl.toFixed(2)}</div>
+                                        </Card>
+                                        <Card title="CAC (Custo Aquisição)" icon="shopping-bag">
+                                            <div className="text-2xl font-bold text-emerald-400">R$ {bscValues.cac.toFixed(2)}</div>
+                                        </Card>
+                                        <Card title="Total Seguidores" icon="trending-up">
+                                            <div className="text-2xl font-bold">
+                                                {((bscValues.ig || 0) + (bscValues.tk || 0) + (bscValues.fb || 0) + (bscValues.yt || 0) + (bscValues.kw || 0)).toLocaleString()}
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-400">Data de Comparação (Período 2)</label>
-                                                <input 
-                                                    type="date" 
-                                                    value={compareDate2}
-                                                    onChange={(e) => setCompareDate2(e.target.value)}
-                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                />
+                                        </Card>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                        {/* Marketing e Leads */}
+                                        <Card title="Métricas de Marketing" icon="activity">
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase font-bold">Investimento Tráfego</label>
+                                                        <input type="number" value={bscValues.investment} onChange={(e) => updateBscValue('investment', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-emerald-400 font-bold" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase font-bold">Meta do Mês</label>
+                                                        <input type="number" value={bscValues.meta} onChange={(e) => updateBscValue('meta', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                    </div>
+                                                </div>
+                                                <div className="pt-4 border-t border-slate-800">
+                                                    <h4 className="text-xs font-bold text-indigo-400 mb-4 uppercase">Entrada de Leads</h4>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-[10px] text-slate-500 uppercase">Leads Tráfego</label>
+                                                            <input type="number" value={bscValues.leadsTraffic} onChange={(e) => updateBscValue('leadsTraffic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-slate-500 uppercase">Leads Orgânico</label>
+                                                            <input type="number" value={bscValues.leadsOrganic} onChange={(e) => updateBscValue('leadsOrganic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-slate-500 uppercase">Qualificados Tráfego</label>
+                                                            <input type="number" value={bscValues.qualTraffic} onChange={(e) => updateBscValue('qualTraffic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-slate-500 uppercase">Fechados Tráfego</label>
+                                                            <input type="number" value={bscValues.closedTraffic} onChange={(e) => updateBscValue('closedTraffic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
+                                        </Card>
+
+                                        {/* Redes Sociais */}
+                                        <Card title="Social Media & Google" icon="share-2">
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase">Instagram</label>
+                                                        <input type="number" value={bscValues.ig} onChange={(e) => updateBscValue('ig', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase">TikTok</label>
+                                                        <input type="number" value={bscValues.tk} onChange={(e) => updateBscValue('tk', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase">Facebook</label>
+                                                        <input type="number" value={bscValues.fb} onChange={(e) => updateBscValue('fb', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase">YouTube</label>
+                                                        <input type="number" value={bscValues.yt} onChange={(e) => updateBscValue('yt', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase">Kawai</label>
+                                                        <input type="number" value={bscValues.kw} onChange={(e) => updateBscValue('kw', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-500 uppercase text-indigo-400 font-bold">Comentários Google (+)</label>
+                                                        <input type="number" value={bscValues.googlePositive} onChange={(e) => updateBscValue('googlePositive', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 border-indigo-900" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'consultants' && (
+                                <div className="space-y-8 animate-in fade-in">
+                                    <Card title="Gerenciar Consultores e Metas" icon="users">
+                                        <div className="flex gap-4 mb-8">
+                                            <input type="text" value={newConsultantName} onChange={(e) => setNewConsultantName(e.target.value)} placeholder="Nome do Consultor..." className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-500" />
+                                            <button onClick={addConsultant} className="bg-indigo-600 px-6 py-2 rounded-lg font-bold hover:bg-indigo-500 transition-all">Adicionar</button>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {consultants.map(c => (
+                                                <div key={c.name} className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl flex flex-col md:flex-row items-center gap-6">
+                                                    <div className="flex-1 font-bold text-lg text-indigo-300">{c.name}</div>
+                                                    <div className="flex gap-4 items-center">
+                                                        <label className="text-xs text-slate-400">Fechou na Semana:</label>
+                                                        <input type="number" value={c.weeklyClosed} onChange={(e) => updateConsultantValues(c.name, 'weeklyClosed', e.target.value)} className="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1" />
+                                                    </div>
+                                                    <div className="flex gap-4 items-center">
+                                                        <label className="text-xs text-slate-400">Fechou no Mês:</label>
+                                                        <input type="number" value={c.monthlyClosed} onChange={(e) => updateConsultantValues(c.name, 'monthlyClosed', e.target.value)} className="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1" />
+                                                    </div>
+                                                    <button onClick={() => setConsultants(consultants.filter(x => x.name !== c.name))} className="text-red-400 hover:text-red-300"><Icon name="trash-2" size={18} /></button>
+                                                </div>
+                                            ))}
                                         </div>
                                     </Card>
+                                </div>
+                            )}
 
-                                    {comparisonResults ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <Card title="Diferença de Leads">
-                                                <div className="text-3xl font-bold mb-2">{comparisonResults.p2.totalLeads} <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.totalLeads}</span></div>
-                                                <div className={`flex items-center gap-1 text-sm font-bold ${comparisonResults.diffLeads.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    <Icon name={comparisonResults.diffLeads.diff >= 0 ? "trending-up" : "trending-down"} size={16} />
-                                                    {comparisonResults.diffLeads.diff >= 0 ? "+" : ""}{comparisonResults.diffLeads.percent}%
+                            {activeTab === 'compare' && (
+                                <div className="space-y-8 animate-in fade-in">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <Card title="Comparativo Mes a Mes" icon="calendar">
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <select value={monthCompare1} onChange={(e) => setMonthCompare1(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
+                                                        <option value="">Mês Base</option>
+                                                        {Object.keys(monthlyAggregation).map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
+                                                    <select value={monthCompare2} onChange={(e) => setMonthCompare2(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
+                                                        <option value="">Mês Comparação</option>
+                                                        {Object.keys(monthlyAggregation).map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
                                                 </div>
-                                            </Card>
-                                            <Card title="Diferença de Fechados">
-                                                <div className="text-3xl font-bold mb-2">{comparisonResults.p2.totalFechado} <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.totalFechado}</span></div>
-                                                <div className={`flex items-center gap-1 text-sm font-bold ${comparisonResults.diffFechado.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    <Icon name={comparisonResults.diffFechado.diff >= 0 ? "trending-up" : "trending-down"} size={16} />
-                                                    {comparisonResults.diffFechado.diff >= 0 ? "+" : ""}{comparisonResults.diffFechado.percent}%
+                                                {monthDiffResults && (
+                                                    <div className="pt-4 border-t border-slate-800">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-slate-400">Variação:</span>
+                                                            <span className={`text-2xl font-bold ${monthDiffResults.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                {monthDiffResults.diff >= 0 ? '+' : ''}{monthDiffResults.diff} ({monthDiffResults.percent}%)
+                                                                <Icon name={monthDiffResults.diff >= 0 ? "trending-up" : "trending-down"} size={20} className="inline ml-2" />
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </Card>
+                                        <Card title="Consultor vs Consultor" icon="users">
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <select value={consCompare1} onChange={(e) => setConsCompare1(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
+                                                        <option value="">Consultor 1</option>
+                                                        {consultants.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                                    </select>
+                                                    <select value={consCompare2} onChange={(e) => setConsCompare2(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
+                                                        <option value="">Consultor 2</option>
+                                                        {consultants.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                                    </select>
                                                 </div>
-                                            </Card>
-                                            <Card title="Variação na Conversão">
-                                                <div className="text-3xl font-bold mb-2">{comparisonResults.p2.conversion}% <span className="text-sm text-slate-500 font-normal">vs {comparisonResults.p1.conversion}%</span></div>
-                                                <div className={`flex items-center gap-1 text-sm font-bold ${Number(comparisonResults.diffConv.diff) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                    <Icon name={Number(comparisonResults.diffConv.diff) >= 0 ? "plus" : "minus"} size={16} />
-                                                    {comparisonResults.diffConv.diff} pontos perc.
-                                                </div>
-                                            </Card>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-20 text-center text-slate-500 italic">
-                                            Selecione as duas datas acima para comparar o desempenho.
-                                        </div>
-                                    )}
+                                                {consCompare1 && consCompare2 && (
+                                                    <div className="pt-4 border-t border-slate-800 space-y-2">
+                                                        {consultants.filter(c => c.name === consCompare1 || c.name === consCompare2).map(c => (
+                                                            <div key={c.name} className="flex justify-between items-center">
+                                                                <span className="text-slate-300 font-medium">{c.name}</span>
+                                                                <span className="text-indigo-400 font-bold">Mês: {c.monthlyClosed} | Sem: {c.weeklyClosed}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </Card>
+                                    </div>
                                 </div>
                             )}
 
                             {activeTab === 'input' && (
-                                <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
-                                    {/* Gerenciamento de Consultores */}
-                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-                                        <h2 className="text-xl font-bold flex items-center gap-3 mb-6">
-                                            <Icon name="users" className="text-indigo-500" /> Gerenciar Consultores
-                                        </h2>
-                                        <div className="flex flex-col md:flex-row gap-4 mb-6">
-                                            <input 
-                                                type="text"
-                                                value={newConsultantName}
-                                                onChange={(e) => setNewConsultantName(e.target.value)}
-                                                placeholder="Nome do novo consultor..."
-                                                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                            />
-                                            <button onClick={handleAddConsultant} className="bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-all">
-                                                <Icon name="user-plus" /> Adicionar
+                                <div className="max-w-4xl mx-auto animate-in fade-in">
+                                    <Card title="Novo Registro Geral" icon="plus">
+                                        <div className="space-y-8">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-slate-400">Data do Registro</label>
+                                                    <input type="date" value={registrationDate} onChange={(e) => setRegistrationDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
+                                                </div>
+                                            </div>
+                                            <div className="pt-4 border-t border-slate-800">
+                                                <h3 className="text-indigo-400 font-bold mb-6">Status dos Atendimentos</h3>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                                    {STATUS_OPTIONS.map(s => (
+                                                        <div key={s.id} className="space-y-2">
+                                                            <label className="text-xs text-slate-400 uppercase tracking-wider">{s.label}</label>
+                                                            <input type="number" value={formData[s.id]} onChange={(e) => setFormData({...formData, [s.id]: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 outline-none" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="pt-4 border-t border-slate-800">
+                                                <h3 className="text-indigo-400 font-bold mb-6">Contagem de Processos</h3>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                    {PROCESS_OPTIONS.map(p => (
+                                                        <div key={p.id} className="space-y-1">
+                                                            <label className="text-[10px] text-slate-500 uppercase truncate block">{p.label}</label>
+                                                            <input type="number" value={formData[p.id] || 0} onChange={(e) => setFormData({...formData, [p.id]: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-sm" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <button onClick={handleSave} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                                                <Icon name="save" /> Salvar Relatório
                                             </button>
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {consultants.map(c => (
-                                                <div key={c} className="flex items-center gap-2 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-full group">
-                                                    <span className="text-sm font-medium">{c}</span>
-                                                    <button onClick={() => handleRemoveConsultant(c)} className="text-slate-500 hover:text-red-400 transition-colors">
-                                                        <Icon name="x" size={14} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Registro de Dados */}
-                                    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-                                        <div className="bg-indigo-600/10 p-8 border-b border-slate-800">
-                                            <h2 className="text-2xl font-bold flex items-center gap-3">
-                                                <Icon name="plus" className="text-indigo-500" /> Inserir Novo Registro
-                                            </h2>
-                                        </div>
-                                        <div className="p-8 space-y-8">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-400 mb-2">Consultor Responsável</label>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        {consultants.map(c => (
-                                                            <button
-                                                                key={c}
-                                                                onClick={() => setSelectedConsultant(c)}
-                                                                className={`py-3 px-4 rounded-xl text-sm font-medium transition-all border ${
-                                                                    selectedConsultant === c ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
-                                                                }`}
-                                                            >
-                                                                {c}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-slate-400 mb-2">Data do Registro</label>
-                                                    <input 
-                                                        type="date"
-                                                        value={registrationDate}
-                                                        onChange={(e) => setRegistrationDate(e.target.value)}
-                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Status Grid */}
-                                            <div className="pt-4 border-t border-slate-800">
-                                                <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest mb-6">Status dos Atendimentos (Leads)</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                    {STATUS_OPTIONS.map(status => (
-                                                        <div key={status.id} className="space-y-2">
-                                                            <label className="block text-xs font-medium text-slate-300 flex items-center justify-between">
-                                                                {status.label}
-                                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }}></span>
-                                                            </label>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                value={formData[status.id]}
-                                                                onChange={(e) => setFormData({ ...formData, [status.id]: e.target.value })}
-                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg py-3 px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* Processos Grid */}
-                                            <div className="pt-4 border-t border-slate-800">
-                                                <h3 className="text-sm font-semibold text-indigo-400 uppercase tracking-widest mb-6">Contagem de Processos</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    {PROCESS_OPTIONS.map(proc => (
-                                                        <div key={proc.id} className="space-y-1">
-                                                            <label className="block text-[10px] font-medium text-slate-400 uppercase">
-                                                                {proc.label}
-                                                            </label>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                value={formData[proc.id]}
-                                                                onChange={(e) => setFormData({ ...formData, [proc.id]: e.target.value })}
-                                                                className="w-full bg-slate-900 border border-slate-800 rounded-md py-2 px-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            <div className="pt-6">
-                                                <button
-                                                    onClick={handleSave}
-                                                    disabled={!selectedConsultant}
-                                                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
-                                                >
-                                                    <Icon name="save" /> Salvar Relatório Completo
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'records' && (
-                                <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto shadow-xl">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-slate-800/50 text-slate-400 text-xs uppercase tracking-widest">
-                                            <tr>
-                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Consultor</th>
-                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Data</th>
-                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Fechados</th>
-                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide">Processos</th>
-                                                <th className="px-6 py-4 border-b border-slate-800 font-semibold tracking-wide text-right">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-800">
-                                            {filteredData.map((item) => (
-                                                <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
-                                                    <td className="px-6 py-4 font-medium">{item.consultant}</td>
-                                                    <td className="px-6 py-4 text-slate-400">{new Date(item.date).toLocaleDateString('pt-BR')}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded text-xs font-bold">
-                                                            {item.values.fechado}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-indigo-400 font-medium">
-                                                        {PROCESS_OPTIONS.reduce((acc, p) => acc + Number(item.values[p.id] || 0), 0)}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => deleteRecord(item.id)} className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-400/10 rounded">
-                                                            <Icon name="trash-2" size={18} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {filteredData.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500 italic">Nenhum dado registrado ainda.</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
+                                    </Card>
                                 </div>
                             )}
                         </div>
