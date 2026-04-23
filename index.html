@@ -4,44 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VendasPro - Dashboard Executivo</title>
-    <!-- Tailwind CSS para Estilização -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Bibliotecas Base (Ordem Crítica) -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <!-- Bibliotecas Base -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    <!-- Recharts (Versão estável específica para evitar erros de ForwardRef) -->
     <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
-    <!-- Babel e Ícones -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #020617; }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         
-        /* Chrome, Safari, Edge, Opera */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        .dark ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+        
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
           -webkit-appearance: none;
           margin: 0;
         }
+
+        .bsc-table-row:hover { background-color: rgba(99, 102, 241, 0.05); }
+        
+        .transition-theme { transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100">
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-theme">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
-        
         const { 
             BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
             PieChart, Pie, Cell, AreaChart, Area 
         } = window.Recharts;
+
+        const apiKey = ""; // Ambiente injeta a chave automaticamente
 
         const Icon = ({ name, size = 20, className = "" }) => {
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
@@ -90,32 +103,46 @@
             const [data, setData] = useState([]);
             const [consultants, setConsultants] = useState([]);
             const [bscData, setBscData] = useState({});
-            const [newConsultantName, setNewConsultantName] = useState('');
+            const [theme, setTheme] = useState('dark');
             const [activeTab, setActiveTab] = useState('dashboard');
+            
+            // Estados de Lógica
+            const [newConsultantName, setNewConsultantName] = useState('');
             const [registrationDate, setRegistrationDate] = useState(new Date().toISOString().split('T')[0]);
             const [formData, setFormData] = useState({ aguardando: 0, fechado: 0, negociacao: 0, sem_dados: 0, sem_possibilidade: 0, visita: 0 });
-            
-            const [monthCompare1, setMonthCompare1] = useState("");
-            const [monthCompare2, setMonthCompare2] = useState("");
-            const [consCompare1, setConsCompare1] = useState("");
-            const [consCompare2, setConsCompare2] = useState("");
-            
             const [currentBscMonth, setCurrentBscMonth] = useState(new Date().toISOString().substring(0, 7));
+            
+            // Estados de IA & Resumos
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [aiAdvice, setAiAdvice] = useState(null);
+
+            // Comparativos BSC
+            const [bscComp1, setBscComp1] = useState("");
+            const [bscComp2, setBscComp2] = useState("");
 
             useEffect(() => {
-                const savedData = localStorage.getItem('executive_dashboard_data');
+                const savedData = localStorage.getItem('vendaspro_data');
                 if (savedData) setData(JSON.parse(savedData));
-                const savedConsultants = localStorage.getItem('executive_consultants');
-                if (savedConsultants) setConsultants(JSON.parse(savedConsultants));
-                const savedBsc = localStorage.getItem('executive_bsc_data');
+                const savedCons = localStorage.getItem('vendaspro_cons');
+                if (savedCons) setConsultants(JSON.parse(savedCons));
+                const savedBsc = localStorage.getItem('vendaspro_bsc');
                 if (savedBsc) setBscData(JSON.parse(savedBsc));
+                const savedTheme = localStorage.getItem('vendaspro_theme');
+                if (savedTheme) setTheme(savedTheme);
             }, []);
 
-            useEffect(() => { localStorage.setItem('executive_dashboard_data', JSON.stringify(data)); }, [data]);
-            useEffect(() => { localStorage.setItem('executive_consultants', JSON.stringify(consultants)); }, [consultants]);
-            useEffect(() => { localStorage.setItem('executive_bsc_data', JSON.stringify(bscData)); }, [bscData]);
+            useEffect(() => {
+                localStorage.setItem('vendaspro_data', JSON.stringify(data));
+                localStorage.setItem('vendaspro_cons', JSON.stringify(consultants));
+                localStorage.setItem('vendaspro_bsc', JSON.stringify(bscData));
+                localStorage.setItem('vendaspro_theme', theme);
+                if (theme === 'dark') document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [data, consultants, bscData, theme]);
 
-            const handleSave = () => {
+            const handleThemeToggle = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+            const handleSaveRecord = () => {
                 const newEntry = {
                     id: Date.now(),
                     consultant: "Geral",
@@ -127,19 +154,12 @@
                 setActiveTab('dashboard');
             };
 
-            const addConsultant = () => {
-                if (!newConsultantName.trim()) return;
-                const newC = {
-                    name: newConsultantName.trim(),
-                    weeklyClosed: 0,
-                    monthlyClosed: 0
-                };
-                setConsultants([...consultants, newC]);
-                setNewConsultantName('');
-            };
-
-            const updateConsultantValues = (name, field, value) => {
-                setConsultants(consultants.map(c => c.name === name ? { ...c, [field]: Number(value) } : c));
+            const deleteBscMonth = (month) => {
+                if (confirm(`Excluir todos os dados de ${month}?`)) {
+                    const newBsc = { ...bscData };
+                    delete newBsc[month];
+                    setBscData(newBsc);
+                }
             };
 
             const updateBscValue = (field, value) => {
@@ -147,30 +167,95 @@
                     ...prev,
                     [currentBscMonth]: {
                         ...prev[currentBscMonth],
-                        [field]: Number(value) || 0
+                        [field]: value === '' ? 0 : Number(value)
                     }
                 }));
             };
 
-            const bscValues = useMemo(() => {
-                const values = bscData[currentBscMonth] || {};
-                const investment = values.investment || 0;
-                const leadsTraffic = values.leadsTraffic || 0;
-                const leadsOrganic = values.leadsOrganic || 0;
-                const totalLeads = leadsTraffic + leadsOrganic;
+            const getBscMetrics = (month) => {
+                const values = bscData[month] || {};
+                const invMeta = values.investmentMeta || 0;
+                const invGoogle = values.investmentGoogle || 0;
+                const totalInv = invMeta + invGoogle;
+                const leadsT = values.leadsTraffic || 0;
+                const leadsO = values.leadsOrganic || 0;
+                const totalL = leadsT + leadsO;
+                const closedT = values.closedTraffic || 0;
+                const closedO = values.closedOrganic || 0;
+                const totalC = closedT + closedO;
+                const cpl = leadsT > 0 ? (totalInv / leadsT) : 0;
+                const cac = closedT > 0 ? (totalInv / closedT) : 0;
+                return { ...values, totalInv, totalL, totalC, cpl, cac, leadsT, leadsO, closedT, closedO };
+            };
+
+            const currentBsc = useMemo(() => getBscMetrics(currentBscMonth), [bscData, currentBscMonth]);
+
+            const callGeminiAI = async () => {
+                setIsAnalyzing(true);
+                setAiAdvice(null);
                 
-                const closedTraffic = values.closedTraffic || 0;
-                const closedOrganic = values.closedOrganic || 0;
-                const totalClosed = closedTraffic + closedOrganic;
+                const prompt = `Como um consultor de marketing e vendas sênior, analise estes dados do mês de ${currentBscMonth}: 
+                Investimento Total: R$ ${currentBsc.totalInv}. 
+                Leads Tráfego: ${currentBsc.leadsT}. 
+                Leads Orgânico: ${currentBsc.leadsO}. 
+                Fechamentos Tráfego: ${currentBsc.closedT}. 
+                Fechamentos Orgânico: ${currentBsc.closedO}. 
+                CPL: R$ ${currentBsc.cpl.toFixed(2)}. 
+                CAC: R$ ${currentBsc.cac.toFixed(2)}.
+                Dê 3 dicas práticas e curtas para melhorar os resultados no próximo mês. Responda em Português e seja direto.`;
 
-                const cpl = leadsTraffic > 0 ? (investment / leadsTraffic) : 0;
-                const cac = closedTraffic > 0 ? (investment / closedTraffic) : 0;
+                try {
+                    let retries = 0;
+                    const maxRetries = 5;
+                    const backoff = [1000, 2000, 4000, 8000, 16000];
 
-                return { 
-                    ...values, investment, leadsTraffic, leadsOrganic, totalLeads, 
-                    closedTraffic, closedOrganic, totalClosed, cpl, cac 
+                    const fetchAdvice = async () => {
+                        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                        });
+                        if (!response.ok) throw new Error('Falha na API');
+                        const result = await response.json();
+                        return result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    };
+
+                    while (retries < maxRetries) {
+                        try {
+                            const text = await fetchAdvice();
+                            setAiAdvice(text);
+                            break;
+                        } catch (e) {
+                            retries++;
+                            if (retries === maxRetries) throw e;
+                            await new Promise(r => setTimeout(r, backoff[retries - 1]));
+                        }
+                    }
+                } catch (err) {
+                    setAiAdvice("Não foi possível conectar à IA no momento. Verifique sua conexão.");
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+
+            const bscComparison = useMemo(() => {
+                if (!bscComp1 || !bscComp2) return null;
+                const m1 = getBscMetrics(bscComp1);
+                const m2 = getBscMetrics(bscComp2);
+                
+                const calcDiff = (v1, v2) => ({
+                    diff: v2 - v1,
+                    percent: v1 > 0 ? ((v2 - v1) / v1 * 100).toFixed(1) : (v2 > 0 ? 100 : 0)
+                });
+
+                return {
+                    inv: calcDiff(m1.totalInv, m2.totalInv),
+                    leads: calcDiff(m1.totalL, m2.totalL),
+                    closed: calcDiff(m1.totalC, m2.totalC),
+                    cpl: calcDiff(m1.cpl, m2.cpl),
+                    m1, m2
                 };
-            }, [bscData, currentBscMonth]);
+            }, [bscData, bscComp1, bscComp2]);
 
             const stats = useMemo(() => {
                 const totalFechado = data.reduce((acc, curr) => acc + Number(curr.values.fechado || 0), 0);
@@ -192,47 +277,15 @@
             const statusTotals = useMemo(() => {
                 const totals = STATUS_OPTIONS.map(s => ({ name: s.label, value: 0, color: s.color, id: s.id }));
                 data.forEach(entry => {
-                    STATUS_OPTIONS.forEach((opt, idx) => {
-                        totals[idx].value += Number(entry.values[opt.id] || 0);
-                    });
+                    STATUS_OPTIONS.forEach((opt, idx) => { totals[idx].value += Number(entry.values[opt.id] || 0); });
                 });
                 return totals.filter(t => t.value > 0);
             }, [data]);
 
-            const processTotals = useMemo(() => {
-                const totals = PROCESS_OPTIONS.map(p => ({ name: p.label, value: 0, id: p.id }));
-                data.forEach(entry => {
-                    PROCESS_OPTIONS.forEach((opt, idx) => {
-                        totals[idx].value += Number(entry.values[opt.id] || 0);
-                    });
-                });
-                return totals.filter(t => t.value > 0).sort((a, b) => b.value - a.value);
-            }, [data]);
-
-            const monthlyAggregation = useMemo(() => {
-                const months = {};
-                data.forEach(d => {
-                    const monthKey = d.date.substring(0, 7);
-                    if (!months[monthKey]) months[monthKey] = { label: monthKey, fechado: 0, processos: 0 };
-                    months[monthKey].fechado += Number(d.values.fechado || 0);
-                    PROCESS_OPTIONS.forEach(p => months[monthKey].processos += Number(d.values[p.id] || 0));
-                });
-                return months;
-            }, [data]);
-
-            const monthDiffResults = useMemo(() => {
-                if (!monthCompare1 || !monthCompare2) return null;
-                const m1 = monthlyAggregation[monthCompare1] || { fechado: 0 };
-                const m2 = monthlyAggregation[monthCompare2] || { fechado: 0 };
-                const diff = m2.fechado - m1.fechado;
-                const percent = m1.fechado > 0 ? ((diff / m1.fechado) * 100).toFixed(1) : (m2.fechado > 0 ? 100 : 0);
-                return { m1, m2, diff, percent };
-            }, [monthlyAggregation, monthCompare1, monthCompare2]);
-
             const Card = ({ title, children, icon, className = "" }) => (
-                <div className={`bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl ${className}`}>
+                <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm transition-theme ${className}`}>
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-slate-400 font-medium text-sm uppercase tracking-wider">{title}</h3>
+                        <h3 className="text-slate-500 dark:text-slate-400 font-semibold text-xs uppercase tracking-widest">{title}</h3>
                         {icon && <Icon name={icon} className="text-indigo-500" />}
                     </div>
                     {children}
@@ -240,333 +293,342 @@
             );
 
             return (
-                <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-                    <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col z-50">
+                <div className="min-h-screen transition-theme">
+                    {/* Navigation */}
+                    <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 transition-theme shadow-lg md:shadow-none">
                         <div className="p-6 mb-8 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
                                 <Icon name="trending-up" className="text-white" />
                             </div>
-                            <span className="hidden md:block font-bold text-xl tracking-tight">Vendas<span className="text-indigo-500">Pro</span></span>
+                            <span className="hidden md:block font-bold text-xl tracking-tighter">Vendas<span className="text-indigo-500">Pro</span></span>
                         </div>
                         <div className="flex-1 px-4 space-y-2">
                             {[
                                 { id: 'dashboard', label: 'Dashboard', icon: 'bar-chart-2' },
-                                { id: 'consultants', label: 'Consultores', icon: 'users' },
-                                { id: 'compare', label: 'Comparativo', icon: 'git-compare' },
                                 { id: 'bsc', label: 'BSC Marketing', icon: 'pie-chart' },
-                                { id: 'input', label: 'Novo Registro', icon: 'plus' },
+                                { id: 'input', label: 'Novo Registro', icon: 'plus-circle' },
+                                { id: 'consultants', label: 'Consultores', icon: 'users' },
+                                { id: 'compare', label: 'Histórico', icon: 'calendar' },
                             ].map((item) => (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'}`}>
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                                     <Icon name={item.icon} />
                                     <span className="hidden md:block font-medium">{item.label}</span>
                                 </button>
                             ))}
                         </div>
+                        <div className="p-6 border-t border-slate-200 dark:border-slate-800 space-y-4">
+                            <button onClick={handleThemeToggle} className="w-full flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-all rounded-xl">
+                                <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+                                <span className="hidden md:block font-medium">{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
+                            </button>
+                        </div>
                     </nav>
 
-                    <main className="pl-20 md:pl-64 transition-all duration-300">
-                        <header className="p-6 md:p-10">
-                            <h1 className="text-3xl font-bold text-white">Relatório Executivo</h1>
-                            <p className="text-slate-400 mt-1">Gestão de performance e processos.</p>
+                    <main className="pl-20 md:pl-64 min-h-screen transition-theme">
+                        <header className="p-6 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-4xl font-extrabold tracking-tight">Executivo</h1>
+                                <p className="text-slate-500 dark:text-slate-400">Visão geral e planejamento estratégico.</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className="text-xs font-bold px-3 py-1 bg-indigo-500/10 text-indigo-500 rounded-full border border-indigo-500/20 uppercase tracking-widest">
+                                    {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+                                </span>
+                            </div>
                         </header>
 
                         <div className="px-6 md:px-10 pb-10 space-y-8">
                             {activeTab === 'dashboard' && (
                                 <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                                        <Card title="Total Leads" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
-                                        <Card title="Total Processos" icon="file-text"><div className="text-3xl font-bold text-indigo-400">{stats.totalProcessos}</div></Card>
-                                        <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-400">{stats.totalFechado}</div></Card>
-                                        <Card title="Taxa Conversão" icon="trending-up"><div className="text-3xl font-bold text-indigo-400">{stats.conversion}%</div></Card>
-                                        <Card title="Top Consultor" icon="award"><div className="text-xl font-bold text-amber-400 truncate">{stats.topConsultant}</div></Card>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <Card title="Leads Captados" icon="users"><div className="text-3xl font-bold">{stats.totalLeads}</div></Card>
+                                        <Card title="Processos Abertos" icon="file-text"><div className="text-3xl font-bold text-indigo-500">{stats.totalProcessos}</div></Card>
+                                        <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-500">{stats.totalFechado}</div></Card>
+                                        <Card title="Taxa Conversão" icon="trending-up"><div className="text-3xl font-bold text-amber-500">{stats.conversion}%</div></Card>
                                     </div>
 
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        <Card title="Status Geral (Leads)" className="lg:col-span-1">
+                                        <Card title="Distribuição de Status" className="lg:col-span-1">
                                             <div className="h-64">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
                                                         <Pie data={statusTotals} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                                                             {statusTotals.map((e, i) => <Cell key={i} fill={e.color} />)}
                                                         </Pie>
-                                                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}/>
+                                                        <Tooltip contentStyle={{ backgroundColor: theme === 'dark' ? '#0f172a' : '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                             </div>
                                         </Card>
-                                        <Card title="Desempenho Semanal/Mensal" className="lg:col-span-2">
+                                        <Card title="Performance de Consultores" className="lg:col-span-2">
                                             <div className="h-72">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <BarChart data={consultants}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                                        <XAxis dataKey="name" stroke="#64748b" />
-                                                        <YAxis stroke="#64748b" />
-                                                        <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
-                                                        <Legend />
-                                                        <Bar dataKey="weeklyClosed" name="Semana" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                                                        <Bar dataKey="monthlyClosed" name="Mês" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                                        <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#1e293b' : '#e2e8f0'} vertical={false} />
+                                                        <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
+                                                        <YAxis stroke="#64748b" fontSize={12} />
+                                                        <Tooltip cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }} contentStyle={{ backgroundColor: theme === 'dark' ? '#0f172a' : '#fff', borderRadius: '12px' }} />
+                                                        <Legend verticalAlign="top" align="right" height={36}/>
+                                                        <Bar dataKey="weeklyClosed" name="Semana" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                                                        <Bar dataKey="monthlyClosed" name="Mês" fill="#10b981" radius={[6, 6, 0, 0]} />
                                                     </BarChart>
                                                 </ResponsiveContainer>
                                             </div>
                                         </Card>
                                     </div>
-
-                                    <Card title="Distribuição de Processos Geral" icon="file-text">
-                                        <div className="h-96">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={processTotals} layout="vertical" margin={{ left: 150 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                                                    <XAxis type="number" stroke="#64748b" />
-                                                    <YAxis type="category" dataKey="name" stroke="#64748b" width={140} fontSize={10} />
-                                                    <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b' }}/>
-                                                    <Bar dataKey="value" name="Quantidade" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </Card>
                                 </>
                             )}
 
                             {activeTab === 'bsc' && (
                                 <div className="space-y-8 animate-in fade-in duration-500">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="flex items-center gap-4 bg-slate-900 border border-slate-800 p-2 rounded-xl">
-                                            <button 
-                                                onClick={() => {
-                                                    const d = new Date(currentBscMonth + "-01");
-                                                    d.setMonth(d.getMonth() - 1);
-                                                    setCurrentBscMonth(d.toISOString().substring(0, 7));
-                                                }}
-                                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"
-                                            >
-                                                <Icon name="chevron-left" />
-                                            </button>
-                                            <span className="font-bold text-indigo-400 min-w-[120px] text-center uppercase">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                        <div className="flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-sm transition-theme">
+                                            <button onClick={() => { const d = new Date(currentBscMonth + "-01"); d.setMonth(d.getMonth() - 1); setCurrentBscMonth(d.toISOString().substring(0, 7)); }} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"><Icon name="chevron-left" /></button>
+                                            <span className="font-extrabold text-indigo-500 min-w-[160px] text-center uppercase tracking-tighter text-lg">
                                                 {new Date(currentBscMonth + "-02").toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                                             </span>
-                                            <button 
-                                                onClick={() => {
-                                                    const d = new Date(currentBscMonth + "-01");
-                                                    d.setMonth(d.getMonth() + 1);
-                                                    setCurrentBscMonth(d.toISOString().substring(0, 7));
-                                                }}
-                                                className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"
-                                            >
-                                                <Icon name="chevron-right" />
+                                            <button onClick={() => { const d = new Date(currentBscMonth + "-01"); d.setMonth(d.getMonth() + 1); setCurrentBscMonth(d.toISOString().substring(0, 7)); }} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"><Icon name="chevron-right" /></button>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button onClick={callGeminiAI} disabled={isAnalyzing} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50">
+                                                <Icon name="sparkles" size={18} /> {isAnalyzing ? 'Analisando...' : 'Dicas e Resumo (IA)'}
+                                            </button>
+                                            <button onClick={() => deleteBscMonth(currentBscMonth)} className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 border border-red-500/20">
+                                                Excluir Mês
                                             </button>
                                         </div>
-                                        <div className="text-slate-400 text-sm">Dados salvos automaticamente por mês.</div>
                                     </div>
 
-                                    {/* Principais KPIs do BSC */}
+                                    {aiAdvice && (
+                                        <div className="bg-indigo-600/5 border border-indigo-500/20 p-8 rounded-3xl animate-in slide-in-from-top-4 duration-500">
+                                            <div className="flex items-start gap-4">
+                                                <div className="bg-indigo-600 p-2 rounded-lg text-white"><Icon name="cpu" /></div>
+                                                <div className="flex-1">
+                                                    <h4 className="font-bold text-indigo-500 uppercase tracking-widest text-xs mb-3">Análise Estratégica IA</h4>
+                                                    <div className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">{aiAdvice}</div>
+                                                </div>
+                                                <button onClick={() => setAiAdvice(null)} className="text-slate-400 hover:text-slate-200"><Icon name="x" size={16}/></button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                        <Card title="Investimento" icon="dollar-sign">
-                                            <div className="text-2xl font-bold">R$ {bscValues.investment.toLocaleString('pt-BR')}</div>
-                                        </Card>
-                                        <Card title="CPL (Custo por Lead)" icon="target">
-                                            <div className="text-2xl font-bold text-indigo-400">R$ {bscValues.cpl.toFixed(2)}</div>
-                                        </Card>
-                                        <Card title="CAC (Custo Aquisição)" icon="shopping-bag">
-                                            <div className="text-2xl font-bold text-emerald-400">R$ {bscValues.cac.toFixed(2)}</div>
-                                        </Card>
-                                        <Card title="Total Seguidores" icon="trending-up">
-                                            <div className="text-2xl font-bold">
-                                                {((bscValues.ig || 0) + (bscValues.tk || 0) + (bscValues.fb || 0) + (bscValues.yt || 0) + (bscValues.kw || 0)).toLocaleString()}
-                                            </div>
-                                        </Card>
+                                        <Card title="Investimento Total" icon="dollar-sign"><div className="text-3xl font-bold">R$ {currentBsc.totalInv.toLocaleString('pt-BR')}</div></Card>
+                                        <Card title="Leads Tráfego" icon="zap"><div className="text-3xl font-bold text-indigo-500">{currentBsc.leadsT}</div></Card>
+                                        <Card title="CPL" icon="trending-down"><div className="text-3xl font-bold text-emerald-500">R$ {currentBsc.cpl.toFixed(2)}</div></Card>
+                                        <Card title="CAC" icon="shopping-bag"><div className="text-3xl font-bold text-amber-500">R$ {currentBsc.cac.toFixed(2)}</div></Card>
                                     </div>
 
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        {/* Marketing e Leads */}
-                                        <Card title="Métricas de Marketing" icon="activity">
-                                            <div className="space-y-6">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase font-bold">Investimento Tráfego</label>
-                                                        <input type="number" value={bscValues.investment} onChange={(e) => updateBscValue('investment', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-emerald-400 font-bold" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase font-bold">Meta do Mês</label>
-                                                        <input type="number" value={bscValues.meta} onChange={(e) => updateBscValue('meta', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                    </div>
+                                    {/* Comparador de Meses BSC */}
+                                    <Card title="Comparar Performance Mensal" icon="git-compare">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] uppercase font-bold text-slate-500">Mês Base</label>
+                                                    <select value={bscComp1} onChange={(e) => setBscComp1(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 outline-none">
+                                                        <option value="">Selecione...</option>
+                                                        {Object.keys(bscData).sort().map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
                                                 </div>
-                                                <div className="pt-4 border-t border-slate-800">
-                                                    <h4 className="text-xs font-bold text-indigo-400 mb-4 uppercase">Entrada de Leads</h4>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <label className="text-[10px] text-slate-500 uppercase">Leads Tráfego</label>
-                                                            <input type="number" value={bscValues.leadsTraffic} onChange={(e) => updateBscValue('leadsTraffic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-slate-500 uppercase">Leads Orgânico</label>
-                                                            <input type="number" value={bscValues.leadsOrganic} onChange={(e) => updateBscValue('leadsOrganic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-slate-500 uppercase">Qualificados Tráfego</label>
-                                                            <input type="number" value={bscValues.qualTraffic} onChange={(e) => updateBscValue('qualTraffic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-slate-500 uppercase">Fechados Tráfego</label>
-                                                            <input type="number" value={bscValues.closedTraffic} onChange={(e) => updateBscValue('closedTraffic', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                        </div>
-                                                    </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] uppercase font-bold text-slate-500">Mês Comparação</label>
+                                                    <select value={bscComp2} onChange={(e) => setBscComp2(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 outline-none">
+                                                        <option value="">Selecione...</option>
+                                                        {Object.keys(bscData).sort().map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
                                                 </div>
                                             </div>
-                                        </Card>
+                                            {bscComparison ? (
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                                                        <div className="text-[10px] text-slate-500 uppercase">Invest.</div>
+                                                        <div className={`font-bold ${bscComparison.inv.diff <= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                            {bscComparison.inv.percent}%
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                                                        <div className="text-[10px] text-slate-500 uppercase">Leads</div>
+                                                        <div className={`font-bold ${bscComparison.leads.diff >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                            {bscComparison.leads.percent}%
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                                                        <div className="text-[10px] text-slate-500 uppercase">Fechados</div>
+                                                        <div className={`font-bold ${bscComparison.closed.diff >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                            {bscComparison.closed.percent}%
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                                                        <div className="text-[10px] text-slate-500 uppercase">CPL</div>
+                                                        <div className={`font-bold ${bscComparison.cpl.diff <= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                            {bscComparison.cpl.percent}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="text-slate-500 italic text-sm text-center py-3">Escolha dois meses para ver a evolução.</div>
+                                            )}
+                                        </div>
+                                    </Card>
 
-                                        {/* Redes Sociais */}
-                                        <Card title="Social Media & Google" icon="share-2">
-                                            <div className="space-y-4">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase">Instagram</label>
-                                                        <input type="number" value={bscValues.ig} onChange={(e) => updateBscValue('ig', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase">TikTok</label>
-                                                        <input type="number" value={bscValues.tk} onChange={(e) => updateBscValue('tk', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase">Facebook</label>
-                                                        <input type="number" value={bscValues.fb} onChange={(e) => updateBscValue('fb', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase">YouTube</label>
-                                                        <input type="number" value={bscValues.yt} onChange={(e) => updateBscValue('yt', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase">Kawai</label>
-                                                        <input type="number" value={bscValues.kw} onChange={(e) => updateBscValue('kw', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-500 uppercase text-indigo-400 font-bold">Comentários Google (+)</label>
-                                                        <input type="number" value={bscValues.googlePositive} onChange={(e) => updateBscValue('googlePositive', e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded p-2 border-indigo-900" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Card>
+                                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm transition-theme">
+                                        <table className="w-full text-sm text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+                                                    <th className="px-8 py-6 border-b border-slate-200 dark:border-slate-800 w-1/2">Métrica Estratégica</th>
+                                                    <th className="px-8 py-6 border-b border-slate-200 dark:border-slate-800 text-center">Valor Registrado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-3 text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Investimentos Pagos</td></tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Investimento Meta (Empresa)</td>
+                                                    <td className="px-8 py-5"><input type="number" value={currentBsc.investmentMeta || ''} onChange={(e) => updateBscValue('investmentMeta', e.target.value)} className="w-48 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-emerald-500 font-bold text-center outline-none focus:ring-2 focus:ring-indigo-500" placeholder="R$ 0,00" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Investimento Google Ads</td>
+                                                    <td className="px-8 py-5"><input type="number" value={currentBsc.investmentGoogle || ''} onChange={(e) => updateBscValue('investmentGoogle', e.target.value)} className="w-48 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-emerald-500 font-bold text-center outline-none focus:ring-2 focus:ring-indigo-500" placeholder="R$ 0,00" /></td>
+                                                </tr>
+                                                
+                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-3 text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Volume de Leads</td></tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Leads Tráfego Pago</td>
+                                                    <td className="px-8 py-5"><input type="number" value={currentBsc.leadsTraffic || ''} onChange={(e) => updateBscValue('leadsTraffic', e.target.value)} className="w-48 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Leads Orgânico / Direto</td>
+                                                    <td className="px-8 py-5"><input type="number" value={currentBsc.leadsOrganic || ''} onChange={(e) => updateBscValue('leadsOrganic', e.target.value)} className="w-48 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+
+                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-3 text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Vendas e Fechamentos</td></tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Fechamentos via Tráfego</td>
+                                                    <td className="px-8 py-5"><input type="number" value={currentBsc.closedTraffic || ''} onChange={(e) => updateBscValue('closedTraffic', e.target.value)} className="w-48 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-emerald-500 font-bold text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Fechamentos Orgânicos</td>
+                                                    <td className="px-8 py-5"><input type="number" value={currentBsc.closedOrganic || ''} onChange={(e) => updateBscValue('closedOrganic', e.target.value)} className="w-48 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-emerald-500 font-bold text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+
+                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-3 text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Comunidade e Social</td></tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-5 font-semibold">Seguidores (IG / TK / FB)</td>
+                                                    <td className="px-8 py-5 flex gap-2 justify-center">
+                                                        <input type="number" placeholder="IG" value={currentBsc.ig || ''} onChange={(e) => updateBscValue('ig', e.target.value)} className="w-16 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-center text-xs" />
+                                                        <input type="number" placeholder="TK" value={currentBsc.tk || ''} onChange={(e) => updateBscValue('tk', e.target.value)} className="w-16 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-center text-xs" />
+                                                        <input type="number" placeholder="FB" value={currentBsc.fb || ''} onChange={(e) => updateBscValue('fb', e.target.value)} className="w-16 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-center text-xs" />
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             )}
 
+                            {activeTab === 'input' && (
+                                <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
+                                    <Card title="Novo Registro de Processos" icon="plus-circle">
+                                        <div className="space-y-8">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="space-y-3">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Data do Lançamento</label>
+                                                    <input type="date" value={registrationDate} onChange={(e) => setRegistrationDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold" />
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                                <h3 className="text-indigo-500 font-bold mb-6 flex items-center gap-2"><Icon name="message-square" size={18}/> Status de Atendimento</h3>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                                    {STATUS_OPTIONS.map(s => (
+                                                        <div key={s.id} className="space-y-2">
+                                                            <label className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{s.label}</label>
+                                                            <input type="number" value={formData[s.id] || ''} onChange={(e) => setFormData({...formData, [s.id]: e.target.value === '' ? 0 : Number(e.target.value)})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-indigo-500 font-bold" placeholder="0" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                                <h3 className="text-indigo-500 font-bold mb-6 flex items-center gap-2"><Icon name="file-text" size={18}/> Processos e Ações</h3>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                    {PROCESS_OPTIONS.map(p => (
+                                                        <div key={p.id} className="space-y-1">
+                                                            <label className="text-[9px] text-slate-500 uppercase font-bold truncate block">{p.label}</label>
+                                                            <input type="number" value={formData[p.id] || ''} onChange={(e) => setFormData({...formData, [p.id]: e.target.value === '' ? 0 : Number(e.target.value)})} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-sm outline-none focus:ring-1 focus:ring-indigo-500" placeholder="0" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button onClick={handleSaveRecord} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-5 rounded-2xl shadow-xl shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-3 text-lg">
+                                                <Icon name="check-circle" /> Confirmar e Gravar Dados
+                                            </button>
+                                        </div>
+                                    </Card>
+                                </div>
+                            )}
+
                             {activeTab === 'consultants' && (
-                                <div className="space-y-8 animate-in fade-in">
-                                    <Card title="Gerenciar Consultores e Metas" icon="users">
-                                        <div className="flex gap-4 mb-8">
-                                            <input type="text" value={newConsultantName} onChange={(e) => setNewConsultantName(e.target.value)} placeholder="Nome do Consultor..." className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-indigo-500" />
-                                            <button onClick={addConsultant} className="bg-indigo-600 px-6 py-2 rounded-lg font-bold hover:bg-indigo-500 transition-all">Adicionar</button>
+                                <div className="space-y-8 animate-in fade-in duration-500">
+                                    <Card title="Gestão de Equipe" icon="users">
+                                        <div className="flex flex-col md:flex-row gap-4 mb-8">
+                                            <input type="text" value={newConsultantName} onChange={(e) => setNewConsultantName(e.target.value)} placeholder="Nome completo do consultor..." className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-indigo-500 font-medium" />
+                                            <button onClick={addConsultant} className="bg-indigo-600 px-8 py-4 rounded-2xl font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95">Adicionar Membro</button>
                                         </div>
                                         <div className="grid grid-cols-1 gap-4">
                                             {consultants.map(c => (
-                                                <div key={c.name} className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl flex flex-col md:flex-row items-center gap-6">
-                                                    <div className="flex-1 font-bold text-lg text-indigo-300">{c.name}</div>
-                                                    <div className="flex gap-4 items-center">
-                                                        <label className="text-xs text-slate-400">Fechou na Semana:</label>
-                                                        <input type="number" value={c.weeklyClosed} onChange={(e) => updateConsultantValues(c.name, 'weeklyClosed', e.target.value)} className="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1" />
+                                                <div key={c.name} className="bg-white dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row items-center gap-8 transition-theme">
+                                                    <div className="flex-1 flex items-center gap-4">
+                                                        <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-full flex items-center justify-center font-bold text-xl">{c.name[0]}</div>
+                                                        <div className="font-extrabold text-lg">{c.name}</div>
                                                     </div>
-                                                    <div className="flex gap-4 items-center">
-                                                        <label className="text-xs text-slate-400">Fechou no Mês:</label>
-                                                        <input type="number" value={c.monthlyClosed} onChange={(e) => updateConsultantValues(c.name, 'monthlyClosed', e.target.value)} className="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1" />
+                                                    <div className="flex gap-8">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] text-slate-500 uppercase font-bold">Fechou Semana</label>
+                                                            <input type="number" value={c.weeklyClosed || ''} onChange={(e) => updateConsultantValues(c.name, 'weeklyClosed', e.target.value)} className="w-24 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-bold text-center" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] text-slate-500 uppercase font-bold">Fechou Mês</label>
+                                                            <input type="number" value={c.monthlyClosed || ''} onChange={(e) => updateConsultantValues(c.name, 'monthlyClosed', e.target.value)} className="w-24 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 font-bold text-center" />
+                                                        </div>
                                                     </div>
-                                                    <button onClick={() => setConsultants(consultants.filter(x => x.name !== c.name))} className="text-red-400 hover:text-red-300"><Icon name="trash-2" size={18} /></button>
+                                                    <button onClick={() => setConsultants(consultants.filter(x => x.name !== c.name))} className="text-slate-400 hover:text-red-500 transition-colors p-2 hover:bg-red-500/10 rounded-lg"><Icon name="trash-2" size={20} /></button>
                                                 </div>
                                             ))}
+                                            {consultants.length === 0 && <div className="py-20 text-center text-slate-500 italic border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">Nenhum consultor cadastrado na equipe.</div>}
                                         </div>
                                     </Card>
                                 </div>
                             )}
 
                             {activeTab === 'compare' && (
-                                <div className="space-y-8 animate-in fade-in">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <Card title="Comparativo Mes a Mes" icon="calendar">
-                                            <div className="space-y-4">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <select value={monthCompare1} onChange={(e) => setMonthCompare1(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
-                                                        <option value="">Mês Base</option>
-                                                        {Object.keys(monthlyAggregation).map(m => <option key={m} value={m}>{m}</option>)}
-                                                    </select>
-                                                    <select value={monthCompare2} onChange={(e) => setMonthCompare2(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
-                                                        <option value="">Mês Comparação</option>
-                                                        {Object.keys(monthlyAggregation).map(m => <option key={m} value={m}>{m}</option>)}
-                                                    </select>
-                                                </div>
-                                                {monthDiffResults && (
-                                                    <div className="pt-4 border-t border-slate-800">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-slate-400">Variação:</span>
-                                                            <span className={`text-2xl font-bold ${monthDiffResults.diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                                {monthDiffResults.diff >= 0 ? '+' : ''}{monthDiffResults.diff} ({monthDiffResults.percent}%)
-                                                                <Icon name={monthDiffResults.diff >= 0 ? "trending-up" : "trending-down"} size={20} className="inline ml-2" />
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </Card>
-                                        <Card title="Consultor vs Consultor" icon="users">
-                                            <div className="space-y-4">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <select value={consCompare1} onChange={(e) => setConsCompare1(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
-                                                        <option value="">Consultor 1</option>
-                                                        {consultants.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                                                    </select>
-                                                    <select value={consCompare2} onChange={(e) => setConsCompare2(e.target.value)} className="bg-slate-950 border border-slate-800 rounded p-2 text-sm">
-                                                        <option value="">Consultor 2</option>
-                                                        {consultants.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                                                    </select>
-                                                </div>
-                                                {consCompare1 && consCompare2 && (
-                                                    <div className="pt-4 border-t border-slate-800 space-y-2">
-                                                        {consultants.filter(c => c.name === consCompare1 || c.name === consCompare2).map(c => (
-                                                            <div key={c.name} className="flex justify-between items-center">
-                                                                <span className="text-slate-300 font-medium">{c.name}</span>
-                                                                <span className="text-indigo-400 font-bold">Mês: {c.monthlyClosed} | Sem: {c.weeklyClosed}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </Card>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'input' && (
-                                <div className="max-w-4xl mx-auto animate-in fade-in">
-                                    <Card title="Novo Registro Geral" icon="plus">
-                                        <div className="space-y-8">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-slate-400">Data do Registro</label>
-                                                    <input type="date" value={registrationDate} onChange={(e) => setRegistrationDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
-                                                </div>
-                                            </div>
-                                            <div className="pt-4 border-t border-slate-800">
-                                                <h3 className="text-indigo-400 font-bold mb-6">Status dos Atendimentos</h3>
-                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                                                    {STATUS_OPTIONS.map(s => (
-                                                        <div key={s.id} className="space-y-2">
-                                                            <label className="text-xs text-slate-400 uppercase tracking-wider">{s.label}</label>
-                                                            <input type="number" value={formData[s.id]} onChange={(e) => setFormData({...formData, [s.id]: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 outline-none" />
-                                                        </div>
+                                <div className="space-y-8 animate-in fade-in duration-500">
+                                    <Card title="Histórico de Lançamentos" icon="calendar">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-widest border-b border-slate-100 dark:border-slate-800">
+                                                        <th className="px-6 py-4">Data</th>
+                                                        <th className="px-6 py-4">Fechados</th>
+                                                        <th className="px-6 py-4">Leads</th>
+                                                        <th className="px-6 py-4 text-right">Ações</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {data.map(item => (
+                                                        <tr key={item.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all">
+                                                            <td className="px-6 py-5 font-bold">{new Date(item.date).toLocaleDateString('pt-BR')}</td>
+                                                            <td className="px-6 py-5 text-emerald-500 font-bold">{item.values.fechado}</td>
+                                                            <td className="px-6 py-5 text-slate-500">
+                                                                {STATUS_OPTIONS.reduce((acc, s) => acc + (item.values[s.id] || 0), 0)}
+                                                            </td>
+                                                            <td className="px-6 py-5 text-right">
+                                                                <button onClick={() => setData(data.filter(d => d.id !== item.id))} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all"><Icon name="trash-2" size={16}/></button>
+                                                            </td>
+                                                        </tr>
                                                     ))}
-                                                </div>
-                                            </div>
-                                            <div className="pt-4 border-t border-slate-800">
-                                                <h3 className="text-indigo-400 font-bold mb-6">Contagem de Processos</h3>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                    {PROCESS_OPTIONS.map(p => (
-                                                        <div key={p.id} className="space-y-1">
-                                                            <label className="text-[10px] text-slate-500 uppercase truncate block">{p.label}</label>
-                                                            <input type="number" value={formData[p.id] || 0} onChange={(e) => setFormData({...formData, [p.id]: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded p-2 text-sm" />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <button onClick={handleSave} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
-                                                <Icon name="save" /> Salvar Relatório
-                                            </button>
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </Card>
                                 </div>
