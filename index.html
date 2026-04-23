@@ -55,7 +55,7 @@
 
         const apiKey = ""; 
 
-        // Atualizado apenas para as unidades solicitadas
+        // Unidades solicitadas: SC, MG, CE e Geral
         const BRAZIL_STATES = ['Geral', 'SC', 'MG', 'CE'];
 
         const Icon = ({ name, size = 20, className = "" }) => {
@@ -195,7 +195,7 @@
             const callGeminiAI = async () => {
                 setIsAnalyzing(true);
                 setAiAdvice(null);
-                const prompt = `Analise os dados de ${selectedBscState === 'Geral' ? 'Brasil' : selectedBscState} no mês ${currentBscMonth}: Inv: R$ ${currentBsc.totalInv}, Leads: ${currentBsc.totalL}, Fechados: ${currentBsc.totalC}, CPL: R$ ${currentBsc.cpl.toFixed(2)}. Dê 3 dicas curtas e práticas para melhorar.`;
+                const prompt = `Analise os dados da Unidade ${selectedBscState === 'Geral' ? 'Brasil' : selectedBscState} no mês ${currentBscMonth}: Inv: R$ ${currentBsc.totalInv}, Leads: ${currentBsc.totalL}, Fechados: ${currentBsc.totalC}, CPL: R$ ${currentBsc.cpl.toFixed(2)}. Dê 3 dicas curtas e práticas para melhorar o tráfego e conversão.`;
                 try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
@@ -204,7 +204,7 @@
                     });
                     const result = await response.json();
                     setAiAdvice(result.candidates?.[0]?.content?.parts?.[0]?.text);
-                } catch (err) { setAiAdvice("Erro na análise."); } finally { setIsAnalyzing(false); }
+                } catch (err) { setAiAdvice("Erro na análise da IA."); } finally { setIsAnalyzing(false); }
             };
 
             const bscComparison = useMemo(() => {
@@ -270,7 +270,7 @@
                         <header className="p-6 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
                                 <h1 className="text-4xl font-extrabold tracking-tight">Executivo</h1>
-                                <p className="text-slate-500 dark:text-slate-400">Unidades: {BRAZIL_STATES.filter(s => s !== 'Geral').join(', ')}.</p>
+                                <p className="text-slate-500 dark:text-slate-400">Gerenciamento de unidades e performance estratégica.</p>
                             </div>
                         </header>
 
@@ -283,7 +283,7 @@
                                         <Card title="Fechamentos" icon="target"><div className="text-3xl font-bold text-emerald-500">{stats.totalFechado}</div></Card>
                                         <Card title="Conversão" icon="trending-up"><div className="text-3xl font-bold text-amber-500">{stats.conversion}%</div></Card>
                                     </div>
-                                    <Card title="Performance Consultores">
+                                    <Card title="Performance de Consultores">
                                         <div className="h-72">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={consultants}>
@@ -304,7 +304,7 @@
                             {activeTab === 'bsc' && (
                                 <div className="space-y-8 animate-in fade-in duration-500">
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {/* Seleção de Mês */}
+                                        {/* Navegação de Mês */}
                                         <div className="flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm">
                                             <button onClick={() => { const d = new Date(currentBscMonth + "-01"); d.setMonth(d.getMonth() - 1); setCurrentBscMonth(d.toISOString().substring(0, 7)); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"><Icon name="chevron-left" /></button>
                                             <span className="font-extrabold text-indigo-500 flex-1 text-center uppercase tracking-tighter text-sm">
@@ -313,7 +313,7 @@
                                             <button onClick={() => { const d = new Date(currentBscMonth + "-01"); d.setMonth(d.getMonth() + 1); setCurrentBscMonth(d.toISOString().substring(0, 7)); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"><Icon name="chevron-right" /></button>
                                         </div>
 
-                                        {/* Seleção de Estado (Limitado a SC, MG, CE e Geral) */}
+                                        {/* Filtro de Unidade */}
                                         <div className="flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm">
                                             <Icon name="map-pin" className="text-slate-400 ml-2" size={18}/>
                                             <select 
@@ -331,9 +331,9 @@
 
                                         <div className="flex gap-2">
                                             <button onClick={callGeminiAI} disabled={isAnalyzing} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all disabled:opacity-50 text-sm">
-                                                <Icon name="sparkles" size={16} /> {isAnalyzing ? '...' : 'Dicas IA'}
+                                                <Icon name="sparkles" size={16} /> {isAnalyzing ? '...' : 'Analisar (IA)'}
                                             </button>
-                                            <button onClick={() => { if(confirm("Excluir dados desta unidade neste mês?")) setBscData(prev => { const n = {...prev}; if(n[currentBscMonth]) delete n[currentBscMonth][selectedBscState]; return n; }); }} className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-4 rounded-2xl font-bold border border-red-500/20"><Icon name="trash-2" size={16}/></button>
+                                            <button onClick={() => { if(confirm("Deseja apagar os dados desta unidade no mês selecionado?")) setBscData(prev => { const n = {...prev}; if(n[currentBscMonth]) delete n[currentBscMonth][selectedBscState]; return n; }); }} className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-4 rounded-2xl font-bold border border-red-500/20"><Icon name="trash-2" size={16}/></button>
                                         </div>
                                     </div>
 
@@ -358,60 +358,94 @@
                                         <table className="w-full text-sm text-left">
                                             <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-widest text-slate-400">
                                                 <tr>
-                                                    <th className="px-8 py-6">Métrica da Unidade ({selectedBscState})</th>
-                                                    <th className="px-8 py-6 text-center">Valor</th>
+                                                    <th className="px-8 py-6">Métrica Estratégica ({selectedBscState})</th>
+                                                    <th className="px-8 py-6 text-center">Valor do Mês</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                {/* INVESTIMENTO */}
                                                 <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-2 text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Investimento Mensal</td></tr>
                                                 <tr className="bsc-table-row">
-                                                    <td className="px-8 py-4 font-semibold">Meta (Empresa)</td>
+                                                    <td className="px-8 py-4 font-semibold">Investimento Meta (Empresa)</td>
                                                     <td className="px-8 py-4"><input type="number" value={currentBsc.investmentMeta || ''} onChange={(e) => updateBscValue('investmentMeta', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-emerald-500 font-bold text-center outline-none" placeholder="R$ 0,00" /></td>
                                                 </tr>
                                                 <tr className="bsc-table-row">
-                                                    <td className="px-8 py-4 font-semibold">Google Ads</td>
+                                                    <td className="px-8 py-4 font-semibold">Investimento Google Ads</td>
                                                     <td className="px-8 py-4"><input type="number" value={currentBsc.investmentGoogle || ''} onChange={(e) => updateBscValue('investmentGoogle', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-emerald-500 font-bold text-center outline-none" placeholder="R$ 0,00" /></td>
                                                 </tr>
                                                 
-                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-2 text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Volume de Captação</td></tr>
+                                                {/* LEADS */}
+                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-2 text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Captação de Leads</td></tr>
                                                 <tr className="bsc-table-row">
-                                                    <td className="px-8 py-4 font-semibold">Tráfego Pago (WhatsApp/Landing)</td>
+                                                    <td className="px-8 py-4 font-semibold">Leads Tráfego Pago</td>
                                                     <td className="px-8 py-4"><input type="number" value={currentBsc.leadsTraffic || ''} onChange={(e) => updateBscValue('leadsTraffic', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
                                                 </tr>
                                                 <tr className="bsc-table-row">
-                                                    <td className="px-8 py-4 font-semibold">Orgânico (Redes Sociais)</td>
+                                                    <td className="px-8 py-4 font-semibold">Leads Orgânico (Redes)</td>
                                                     <td className="px-8 py-4"><input type="number" value={currentBsc.leadsOrganic || ''} onChange={(e) => updateBscValue('leadsOrganic', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
                                                 </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold">Qualificados Tráfego</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.qualTraffic || ''} onChange={(e) => updateBscValue('qualTraffic', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
 
+                                                {/* FECHAMENTOS */}
                                                 <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-2 text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Fechamentos</td></tr>
                                                 <tr className="bsc-table-row">
-                                                    <td className="px-8 py-4 font-semibold">Via Tráfego Pago</td>
+                                                    <td className="px-8 py-4 font-semibold">Fechados via Tráfego</td>
                                                     <td className="px-8 py-4"><input type="number" value={currentBsc.closedTraffic || ''} onChange={(e) => updateBscValue('closedTraffic', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-emerald-500 font-bold text-center outline-none" placeholder="0" /></td>
                                                 </tr>
                                                 <tr className="bsc-table-row">
-                                                    <td className="px-8 py-4 font-semibold">Via Orgânico</td>
+                                                    <td className="px-8 py-4 font-semibold">Fechados Orgânicos</td>
                                                     <td className="px-8 py-4"><input type="number" value={currentBsc.closedOrganic || ''} onChange={(e) => updateBscValue('closedOrganic', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-emerald-500 font-bold text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+
+                                                {/* REDES SOCIAIS E COMUNIDADE (RESTAURADO) */}
+                                                <tr className="bg-indigo-500/5"><td colSpan="2" className="px-8 py-2 text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Comunidade e Redes Sociais</td></tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold">Instagram (Seguidores)</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.ig || ''} onChange={(e) => updateBscValue('ig', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold">TikTok (Seguidores)</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.tk || ''} onChange={(e) => updateBscValue('tk', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold">Facebook (Seguidores)</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.fb || ''} onChange={(e) => updateBscValue('fb', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold">YouTube (Inscritos)</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.yt || ''} onChange={(e) => updateBscValue('yt', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold">Kwai (Seguidores)</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.kw || ''} onChange={(e) => updateBscValue('kw', e.target.value)} className="w-40 mx-auto block bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-center outline-none" placeholder="0" /></td>
+                                                </tr>
+                                                <tr className="bsc-table-row">
+                                                    <td className="px-8 py-4 font-semibold text-indigo-500">Google Comentários (+)</td>
+                                                    <td className="px-8 py-4"><input type="number" value={currentBsc.googlePositive || ''} onChange={(e) => updateBscValue('googlePositive', e.target.value)} className="w-40 mx-auto block bg-indigo-50 dark:bg-slate-950 border border-indigo-200 dark:border-indigo-900 rounded-xl px-4 py-2 text-indigo-500 font-bold text-center outline-none" placeholder="0" /></td>
                                                 </tr>
                                             </tbody>
                                         </table>
                                     </div>
 
-                                    {/* Comparador de Mês a Mês da Unidade Selecionada */}
-                                    <Card title="Comparativo Evolutivo da Unidade" icon="git-compare">
+                                    {/* Comparador de Mês a Mês */}
+                                    <Card title="Comparativo Evolutivo de Unidade" icon="git-compare">
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
                                             <div className="grid grid-cols-2 gap-4 text-xs">
                                                 <div className="space-y-1">
-                                                    <label className="font-bold text-slate-500 uppercase">Período 1</label>
+                                                    <label className="font-bold text-slate-500 uppercase">Mês Base</label>
                                                     <select value={bscComp1} onChange={(e) => setBscComp1(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 outline-none">
                                                         <option value="">Selecione...</option>
-                                                        {Object.keys(bscData).map(m => <option key={m} value={m}>{m}</option>)}
+                                                        {Object.keys(bscData).sort().map(m => <option key={m} value={m}>{m}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="font-bold text-slate-500 uppercase">Período 2</label>
+                                                    <label className="font-bold text-slate-500 uppercase">Mês Comparação</label>
                                                     <select value={bscComp2} onChange={(e) => setBscComp2(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 outline-none">
                                                         <option value="">Selecione...</option>
-                                                        {Object.keys(bscData).map(m => <option key={m} value={m}>{m}</option>)}
+                                                        {Object.keys(bscData).sort().map(m => <option key={m} value={m}>{m}</option>)}
                                                     </select>
                                                 </div>
                                             </div>
@@ -430,7 +464,7 @@
 
                             {activeTab === 'input' && (
                                 <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
-                                    <Card title="Novo Registro Diário" icon="plus-circle">
+                                    <Card title="Novo Registro Diário Geral" icon="plus-circle">
                                         <div className="space-y-8">
                                             <input type="date" value={registrationDate} onChange={(e) => setRegistrationDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-4 px-6 outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -449,7 +483,7 @@
                                                     </div>
                                                 ))}
                                             </div>
-                                            <button onClick={handleSaveRecord} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-5 rounded-2xl transition-all shadow-xl shadow-indigo-600/20">Gravar Dados</button>
+                                            <button onClick={handleSaveRecord} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-5 rounded-2xl transition-all shadow-xl shadow-indigo-600/20">Confirmar Registro</button>
                                         </div>
                                     </Card>
                                 </div>
@@ -457,10 +491,10 @@
 
                             {activeTab === 'consultants' && (
                                 <div className="space-y-8 animate-in fade-in duration-500">
-                                    <Card title="Equipe Comercial" icon="users">
+                                    <Card title="Gestão da Equipe Comercial" icon="users">
                                         <div className="flex flex-col md:flex-row gap-4 mb-8">
                                             <input type="text" value={newConsultantName} onChange={(e) => setNewConsultantName(e.target.value)} placeholder="Nome do consultor..." className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 outline-none" />
-                                            <button onClick={() => { if(!newConsultantName.trim()) return; setConsultants([...consultants, {name: newConsultantName.trim(), weeklyClosed:0, monthlyClosed:0}]); setNewConsultantName(''); }} className="bg-indigo-600 px-8 py-4 rounded-2xl font-bold">Adicionar</button>
+                                            <button onClick={() => { if(!newConsultantName.trim()) return; setConsultants([...consultants, {name: newConsultantName.trim(), weeklyClosed:0, monthlyClosed:0}]); setNewConsultantName(''); }} className="bg-indigo-600 px-8 py-4 rounded-2xl font-bold">Adicionar Membro</button>
                                         </div>
                                         <div className="space-y-4">
                                             {consultants.map(c => (
@@ -470,7 +504,7 @@
                                                         <input type="number" value={c.weeklyClosed || ''} onChange={(e) => setConsultants(consultants.map(x => x.name === c.name ? {...x, weeklyClosed: Number(e.target.value)} : x))} className="w-20 bg-slate-50 dark:bg-slate-950 rounded-xl p-2 text-center" placeholder="Sem" />
                                                         <input type="number" value={c.monthlyClosed || ''} onChange={(e) => setConsultants(consultants.map(x => x.name === c.name ? {...x, monthlyClosed: Number(e.target.value)} : x))} className="w-20 bg-slate-50 dark:bg-slate-950 rounded-xl p-2 text-center" placeholder="Mês" />
                                                     </div>
-                                                    <button onClick={() => setConsultants(consultants.filter(x => x.name !== c.name))} className="text-red-500"><Icon name="trash-2" size={18}/></button>
+                                                    <button onClick={() => setConsultants(consultants.filter(x => x.name !== c.name))} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-colors"><Icon name="trash-2" size={18}/></button>
                                                 </div>
                                             ))}
                                         </div>
@@ -479,7 +513,7 @@
                             )}
 
                             {activeTab === 'compare' && (
-                                <Card title="Histórico de Entradas Diárias">
+                                <Card title="Histórico Detalhado">
                                     <div className="space-y-4">
                                         {data.map(item => (
                                             <div key={item.id} className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-800 hover:bg-indigo-500/5 transition-all rounded-xl">
@@ -488,12 +522,12 @@
                                                     <span className="text-[10px] text-slate-400">REGISTRO GERAL</span>
                                                 </div>
                                                 <div className="flex gap-4 items-center">
-                                                    <span className="text-emerald-500 font-bold px-3 py-1 bg-emerald-500/10 rounded-full text-xs">F: {item.values.fechado}</span>
-                                                    <button onClick={() => setData(data.filter(d => d.id !== item.id))} className="text-red-500 p-2 hover:bg-red-500/10 rounded-lg"><Icon name="trash-2" size={16}/></button>
+                                                    <span className="text-emerald-500 font-bold px-3 py-1 bg-emerald-500/10 rounded-full text-xs">Fechados: {item.values.fechado}</span>
+                                                    <button onClick={() => setData(data.filter(d => d.id !== item.id))} className="text-red-500 p-2 hover:bg-red-500/10 rounded-lg transition-colors"><Icon name="trash-2" size={16}/></button>
                                                 </div>
                                             </div>
                                         ))}
-                                        {data.length === 0 && <div className="py-20 text-center text-slate-500 italic">Sem registros diários até agora.</div>}
+                                        {data.length === 0 && <div className="py-20 text-center text-slate-500 italic">Sem registros diários para exibir.</div>}
                                     </div>
                                 </Card>
                             )}
